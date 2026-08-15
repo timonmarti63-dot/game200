@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Krone &amp; Kettenhemd</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #12141c;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Courier New', monospace;
+      }
+      #game-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+      }
+      #game canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-wrap">
+      <div id="game"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
