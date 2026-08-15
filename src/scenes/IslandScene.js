@@ -78,7 +78,10 @@ const ISLAND_CONFIGS = {
     wallTint: null,
     floorTile: 'tile_floor',
     hasVillage: true,
-    decorations: ['tree', 'tree', 'tree', 'bush', 'bush', 'bush', 'rock', 'rock', 'flowers', 'flowers', 'flowers', 'flowers'],
+    decorations: [
+      'tree', 'tree', 'tree', 'bush', 'bush', 'bush', 'rock', 'rock',
+      'flowers', 'flowers', 'flowers', 'flowers', 'mushroom', 'reeds', 'butterfly',
+    ],
     spawnTable: [
       {
         Class: Halberdier,
@@ -120,7 +123,7 @@ const ISLAND_CONFIGS = {
     wallTint: 0x585d68,
     floorTile: 'tile_stone_path',
     hasVillage: false,
-    decorations: ['pine_tree', 'pine_tree', 'pine_tree', 'rock', 'rock', 'rock', 'pine_tree', 'rock'],
+    decorations: ['pine_tree', 'pine_tree', 'pine_tree', 'rock', 'rock', 'rock', 'pine_tree', 'rock', 'mushroom', 'tidepool'],
     spawnTable: [
       {
         Class: EliteKnight,
@@ -181,7 +184,12 @@ export default class IslandScene extends Phaser.Scene {
     );
     this.cameras.main.setBounds(0, 0, OUTDOOR_W, OUTDOOR_H);
 
-    this.add.tileSprite(0, 0, OUTDOOR_W, OUTDOOR_H, 'tile_water').setOrigin(0, 0);
+    this.waterBase = this.add.tileSprite(0, 0, OUTDOOR_W, OUTDOOR_H, 'tile_water').setOrigin(0, 0);
+    this.waterShimmer = this.add
+      .tileSprite(0, 0, OUTDOOR_W, OUTDOOR_H, 'tile_water')
+      .setOrigin(0, 0)
+      .setAlpha(0.3)
+      .setBlendMode(Phaser.BlendModes.ADD);
     this.add
       .tileSprite(
         OFFSET - BEACH_MARGIN,
@@ -191,6 +199,7 @@ export default class IslandScene extends Phaser.Scene {
         cfg.beachTile
       )
       .setOrigin(0, 0);
+    this.buildCoastFoam();
     this.add.tileSprite(OFFSET, OFFSET, GRASS_W, GRASS_H, cfg.groundTile).setOrigin(0, 0);
 
     this.arenaFloor = this.add
@@ -324,6 +333,24 @@ export default class IslandScene extends Phaser.Scene {
     });
   }
 
+  // A lapping-tide foam ring around the whole coastline (where sand meets
+  // open water), built from 4 rotated strips of the same tileable texture
+  // and scrolled in update() for motion instead of a static line.
+  buildCoastFoam() {
+    const x0 = OFFSET - BEACH_MARGIN;
+    const y0 = OFFSET - BEACH_MARGIN;
+    const w = GRASS_W + BEACH_MARGIN * 2;
+    const h = GRASS_H + BEACH_MARGIN * 2;
+    const strip = (cx, cy, length, angle) =>
+      this.add.tileSprite(cx, cy, length, 14, 'tile_foam').setAngle(angle).setDepth(3).setAlpha(0.85);
+    this.foamStrips = [
+      strip(x0 + w / 2, y0, w, 0),
+      strip(x0 + w / 2, y0 + h, w, 0),
+      strip(x0, y0 + h / 2, h, 90),
+      strip(x0 + w, y0 + h / 2, h, 90),
+    ];
+  }
+
   // Eisenklamm has no village - a couple of mine entrances dug into the
   // rock instead, purely decorative like the trees/bushes elsewhere.
   buildMineCamp() {
@@ -352,8 +379,11 @@ export default class IslandScene extends Phaser.Scene {
         const worldX = FX(localX);
         const worldY = FY(localY);
         const img = this.add.image(worldX, worldY, key);
-        if (key === 'flowers') {
+        if (key === 'flowers' || key === 'tidepool') {
           img.setOrigin(0.5, 0.6).setDepth(2);
+        } else if (key === 'butterfly') {
+          img.setOrigin(0.5, 0.5).setDepth(2);
+          this.tweens.add({ targets: img, y: worldY - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         } else {
           img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
         }
@@ -630,6 +660,14 @@ export default class IslandScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    this.waterBase.tilePositionX += delta * 0.012;
+    this.waterBase.tilePositionY += delta * 0.008;
+    this.waterShimmer.tilePositionX -= delta * 0.02;
+    this.waterShimmer.tilePositionY += delta * 0.015;
+    this.foamStrips.forEach((s, i) => {
+      s.tilePositionX += delta * 0.02 * (i % 2 === 0 ? 1 : -1);
+    });
+
     this.player.setDepth(this.player.y);
     this.player.sword.setDepth(this.player.y + 1);
     this.enemies.getChildren().forEach((enemy) => {

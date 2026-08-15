@@ -3,6 +3,7 @@ import { INSULTS } from '../systems/Insults.js';
 import { ITEMS } from '../systems/Items.js';
 import Inventory from '../systems/Inventory.js';
 import { Sfx } from '../systems/Sfx.js';
+import { savePlayerState, loadPlayerState, applyPlayerState } from '../systems/PlayerState.js';
 
 const SPEED = 118;
 const GRAIL_SPEED = 210;
@@ -48,6 +49,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.hasGrapple = false;
     this.grappleReadyAt = 0;
     this.grappling = false;
+
+    const saved = loadPlayerState(scene);
+    if (saved) applyPlayerState(this, saved, ITEMS);
 
     this.keys = scene.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
@@ -111,6 +115,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       this.hasGrapple = true;
       this.toast('Der Anstands-Enterhaken ist einsatzbereit! [F] zum Anwenden.');
       Sfx.pickup();
+      savePlayerState(this);
     }
   }
 
@@ -334,11 +339,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     } else {
       Sfx.playerHurt();
     }
+    savePlayerState(this);
   }
 
   heal(amount) {
     this.hp = Math.min(this.maxHp, this.hp + amount);
     this.scene.events.emit('hpChanged', this.hp, this.maxHp);
+    savePlayerState(this);
   }
 }
 

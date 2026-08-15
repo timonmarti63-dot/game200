@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
 import { ITEMS } from '../systems/Items.js';
 import { MAP_INFO } from './IslandScene.js';
+import { panel, makeSlot, setSlotItem, qtyBadge, UI_COLORS } from '../systems/UiKit.js';
 
-const MINIMAP_X = 10;
-const MINIMAP_Y = 10;
-const MINIMAP_W = 96;
+const MINIMAP_X = 8;
+const MINIMAP_Y = 8;
+const MINIMAP_W = 84;
 const MAX_HEART_SLOTS = 6;
+const HOTBAR_SLOT = 28;
+const HOTBAR_GAP = 5;
 
 export default class UIScene extends Phaser.Scene {
   constructor() {
@@ -21,76 +24,79 @@ export default class UIScene extends Phaser.Scene {
     this.minimapScale = MINIMAP_W / MAP_INFO.worldW;
     this.minimapH = minimapH;
 
-    this.add.rectangle(MINIMAP_X + MINIMAP_W / 2, MINIMAP_Y + minimapH / 2, MINIMAP_W + 4, minimapH + 4, 0x0c1220, 1).setScrollFactor(0).setDepth(99);
-    const mg = this.add.graphics().setScrollFactor(0).setDepth(100);
-    mg.fillStyle(0x2f6b3a, 1);
-    mg.fillRect(
+    panel(this, MINIMAP_X - 4, MINIMAP_Y - 4, MINIMAP_W + 8, minimapH + 8, { radius: 7, depth: 98 });
+    const mg = this.add.graphics().setScrollFactor(0).setDepth(99);
+    mg.fillStyle(0x3a7a45, 1);
+    mg.fillRoundedRect(
       MINIMAP_X + MAP_INFO.grass.x * this.minimapScale,
       MINIMAP_Y + MAP_INFO.grass.y * this.minimapScale,
       MAP_INFO.grass.w * this.minimapScale,
-      MAP_INFO.grass.h * this.minimapScale
+      MAP_INFO.grass.h * this.minimapScale,
+      2
     );
-    mg.fillStyle(0x8a8f97, 1);
-    mg.fillRect(
+    mg.fillStyle(0x9aa0ab, 1);
+    mg.fillRoundedRect(
       MINIMAP_X + MAP_INFO.castle.x * this.minimapScale,
       MINIMAP_Y + MAP_INFO.castle.y * this.minimapScale,
       MAP_INFO.castle.w * this.minimapScale,
-      MAP_INFO.castle.h * this.minimapScale
+      MAP_INFO.castle.h * this.minimapScale,
+      1
     );
-    mg.lineStyle(1, 0xf5cf4a, 0.8);
-    mg.strokeRect(MINIMAP_X, MINIMAP_Y, MINIMAP_W, minimapH);
-    this.minimapDot = this.add.circle(MINIMAP_X, MINIMAP_Y, 2.5, 0xff5a4a, 1).setScrollFactor(0).setDepth(101);
+    this.minimapDot = this.add.circle(MINIMAP_X, MINIMAP_Y, 2.5, 0xff5a4a, 1).setStrokeStyle(1, 0xffffff, 0.8).setScrollFactor(0).setDepth(101);
 
     this.hearts = [];
-    const heartsY = MINIMAP_Y + minimapH + 12;
+    const heartsY = MINIMAP_Y + minimapH + 15;
     for (let i = 0; i < MAX_HEART_SLOTS; i++) {
-      const h = this.add.image(18 + i * 18, heartsY, 'heart_full').setScrollFactor(0).setDepth(100).setScale(0.9);
+      const h = this.add.image(16 + i * 15, heartsY, 'heart_full').setScrollFactor(0).setDepth(100).setDisplaySize(13, 12);
       this.hearts.push(h);
     }
 
-    this.bossBarBg = this.add.rectangle(this.scale.width / 2, 24, 240, 16, 0x000000, 0.5).setScrollFactor(0).setDepth(100).setVisible(false);
-    this.bossBarFill = this.add.rectangle(this.scale.width / 2 - 118, 24, 236, 12, 0xb23a2e, 1).setOrigin(0, 0.5).setScrollFactor(0).setDepth(101).setVisible(false);
+    this.bossBarBg = panel(this, this.scale.width / 2 - 122, 6, 244, 30, { radius: 6, depth: 100, shadow: false }).setVisible(false);
+    this.bossBarTrack = this.add.rectangle(this.scale.width / 2, 27, 228, 9, 0x120a0a, 1).setScrollFactor(0).setDepth(101).setVisible(false);
+    this.bossBarFill = this.add
+      .rectangle(this.scale.width / 2 - 113, 27, 224, 6, UI_COLORS.crimson, 1)
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(102)
+      .setVisible(false);
     this.bossName = this.add
-      .text(this.scale.width / 2, 10, '', { fontFamily: 'Georgia, serif', fontSize: '12px', color: '#f5cf4a' })
+      .text(this.scale.width / 2, 13, '', { fontFamily: 'Georgia, serif', fontSize: '11px', color: '#e8b93f' })
       .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(101)
+      .setDepth(102)
       .setVisible(false);
 
     // --- hotbar ---
-    const slotSize = 34;
-    const gap = 6;
-    const hotbarY = this.scale.height - 26;
-    const startX = this.scale.width / 2 - ((4 * slotSize + 3 * gap) / 2) + slotSize / 2;
+    const hotbarY = this.scale.height - 22;
+    const startX = this.scale.width / 2 - ((4 * HOTBAR_SLOT + 3 * HOTBAR_GAP) / 2) + HOTBAR_SLOT / 2;
     this.hotbarSlots = [];
     for (let i = 0; i < 4; i++) {
-      const x = startX + i * (slotSize + gap);
-      const bg = this.add.rectangle(x, hotbarY, slotSize, slotSize, 0x14192a, 1).setStrokeStyle(1, 0x4a5578).setScrollFactor(0).setDepth(100);
-      const icon = this.add.image(x, hotbarY, 'whitepx').setVisible(false).setScrollFactor(0).setDepth(101).setDisplaySize(slotSize - 10, slotSize - 10);
-      const label = this.add
-        .text(x - slotSize / 2 + 3, hotbarY - slotSize / 2 + 1, String(i + 1), { fontFamily: 'Courier New', fontSize: '9px', color: '#8fa0c0' })
+      const x = startX + i * (HOTBAR_SLOT + HOTBAR_GAP);
+      const slot = makeSlot(this, x, hotbarY, HOTBAR_SLOT, { depth: 100 });
+      slot.qty = qtyBadge(this, x - HOTBAR_SLOT / 2, hotbarY - HOTBAR_SLOT / 2, HOTBAR_SLOT, 100);
+      const badge = this.add.circle(x - HOTBAR_SLOT / 2 + 1, hotbarY - HOTBAR_SLOT / 2 + 1, 6, UI_COLORS.gold, 1).setScrollFactor(0).setDepth(102);
+      this.add
+        .text(badge.x, badge.y, String(i + 1), { fontFamily: 'Courier New', fontSize: '8px', color: '#1b2338', fontStyle: 'bold' })
+        .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(101);
-      const qty = this.add
-        .text(x + slotSize / 2 - 2, hotbarY + slotSize / 2 - 2, '', { fontFamily: 'Courier New', fontSize: '9px', color: '#fff6d8', stroke: '#000', strokeThickness: 3 })
-        .setOrigin(1, 1)
-        .setScrollFactor(0)
-        .setDepth(101);
-      this.hotbarSlots.push({ bg, icon, label, qty });
+        .setDepth(103);
+      this.hotbarSlots.push(slot);
     }
 
     this.hint = this.add
-      .text(this.scale.width / 2, this.scale.height - 46, '', {
+      .text(this.scale.width / 2, this.scale.height - 40, '', {
         fontFamily: 'Courier New',
         fontSize: '11px',
         color: '#cfd8e6',
+        stroke: '#0c0f18',
+        strokeThickness: 3,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(100);
 
     this.toastText = this.add
-      .text(this.scale.width / 2, this.scale.height - 72, '', {
+      .text(this.scale.width / 2, this.scale.height - 66, '', {
         fontFamily: 'Georgia, serif',
         fontSize: '14px',
         color: '#fff6d8',
@@ -110,12 +116,14 @@ export default class UIScene extends Phaser.Scene {
     island.events.on('inventoryChanged', this.updateHotbar, this);
     island.events.on('bossSpawned', (boss) => {
       this.bossBarBg.setVisible(true);
+      this.bossBarTrack.setVisible(true);
       this.bossBarFill.setVisible(true);
       this.bossName.setText(boss?.name ?? '').setVisible(true);
     });
     island.events.on('bossHpChanged', this.updateBossBar, this);
     island.events.on('bossDied', () => {
       this.bossBarBg.setVisible(false);
+      this.bossBarTrack.setVisible(false);
       this.bossBarFill.setVisible(false);
       this.bossName.setVisible(false);
     });
@@ -157,21 +165,11 @@ export default class UIScene extends Phaser.Scene {
   }
 
   updateHotbar(inventory) {
-    this.hotbarSlots.forEach((slot, i) => {
-      const entry = inventory.hotbar[i];
-      const def = entry ? ITEMS[entry.id] : null;
-      if (def) {
-        slot.icon.setTexture(def.texture).setVisible(true);
-        slot.qty.setText(entry.qty > 1 ? String(entry.qty) : '').setVisible(entry.qty > 1);
-      } else {
-        slot.icon.setVisible(false);
-        slot.qty.setVisible(false);
-      }
-    });
+    this.hotbarSlots.forEach((slot, i) => setSlotItem(slot, inventory.hotbar[i], ITEMS));
   }
 
   updateBossBar(hp, maxHp) {
-    const w = Math.max(0, (hp / maxHp) * 236);
+    const w = Math.max(0, (hp / maxHp) * 224);
     this.bossBarFill.width = w;
   }
 

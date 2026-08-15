@@ -46,6 +46,13 @@ const SPRITES = [
   'pine_tree',
   'mine_entrance',
   'grapple_hook',
+  'mushroom',
+  'reeds',
+  'driftwood',
+  'seashell',
+  'tidepool',
+  'butterfly',
+  'tile_foam',
 ];
 
 export default class BootScene extends Phaser.Scene {

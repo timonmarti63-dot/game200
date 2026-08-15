@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { ITEMS } from '../systems/Items.js';
+import { panel, makeSlot, setSlotItem, qtyBadge } from '../systems/UiKit.js';
 
-const SLOT = 40;
-const GAP = 8;
+const SLOT = 34;
+const GAP = 7;
 
 export default class InventoryScene extends Phaser.Scene {
   constructor() {
@@ -19,61 +20,64 @@ export default class InventoryScene extends Phaser.Scene {
     this.player = island.player;
     this.inventory = this.player.inventory;
 
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55);
-    this.panel = this.add.rectangle(width / 2, height / 2, width - 40, height - 30, 0x21283a, 0.96);
-    this.panel.setStrokeStyle(2, 0xf5cf4a, 0.6);
+    this.add.rectangle(width / 2, height / 2, width, height, 0x05070c, 0.6);
+    panel(this, 24, 14, width - 48, height - 28, { radius: 10, depth: 10, shadow: false });
 
     this.add
-      .text(width / 2, 22, 'Inventar', { fontFamily: 'Georgia, serif', fontSize: '18px', color: '#f5cf4a' })
-      .setOrigin(0.5);
+      .text(width / 2, 26, 'Rüdigers Rucksack', { fontFamily: 'Georgia, serif', fontSize: '16px', color: '#e8b93f' })
+      .setOrigin(0.5)
+      .setDepth(11);
 
     // --- equipment slots ---
-    this.weaponSlot = this.makeSlot(width / 2 - 60, 58, () => this.onEquipClick('weapon'));
-    this.armorSlot = this.makeSlot(width / 2 + 60, 58, () => this.onEquipClick('armor'));
-    this.add.text(width / 2 - 60, 80, 'Waffe', this.labelStyle()).setOrigin(0.5);
-    this.add.text(width / 2 + 60, 80, 'Rüstung', this.labelStyle()).setOrigin(0.5);
+    this.weaponSlot = this.makeInventorySlot(width / 2 - 56, 58, () => this.onEquipClick('weapon'));
+    this.armorSlot = this.makeInventorySlot(width / 2 + 56, 58, () => this.onEquipClick('armor'));
+    this.label(width / 2 - 56, 78, 'Waffe');
+    this.label(width / 2 + 56, 78, 'Rüstung');
 
     // --- hotbar ---
-    this.add.text(30, 100, 'Hotbar [1-4]', this.labelStyle()).setOrigin(0, 0.5);
+    this.label(38, 98, 'HOTBAR', 'left');
     this.hotbarSlots = [];
     const hotbarStartX = width / 2 - ((4 * SLOT + 3 * GAP) / 2) + SLOT / 2;
     for (let i = 0; i < 4; i++) {
       const x = hotbarStartX + i * (SLOT + GAP);
-      this.hotbarSlots.push(this.makeSlot(x, 122, () => this.onHotbarClick(i)));
+      this.hotbarSlots.push(this.makeInventorySlot(x, 118, () => this.onHotbarClick(i)));
     }
 
     // --- backpack ---
-    this.add.text(30, 150, 'Rucksack', this.labelStyle()).setOrigin(0, 0.5);
+    this.label(38, 145, 'RUCKSACK', 'left');
     this.backpackSlots = [];
     const cols = 6;
     const rows = 2;
     const startX = width / 2 - ((cols * SLOT + (cols - 1) * GAP) / 2) + SLOT / 2;
-    const startY = 172;
+    const startY = 166;
     for (let i = 0; i < cols * rows; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = startX + col * (SLOT + GAP);
       const y = startY + row * (SLOT + GAP);
-      this.backpackSlots.push(this.makeSlot(x, y, () => this.onBackpackClick(i)));
+      this.backpackSlots.push(this.makeInventorySlot(x, y, () => this.onBackpackClick(i)));
     }
 
+    panel(this, 34, height - 56, width - 68, 26, { radius: 6, depth: 10, shadow: false, fillAlpha: 0.7 });
     this.detailText = this.add
-      .text(width / 2, height - 44, '', {
+      .text(width / 2, height - 43, 'Fahr mit der Maus über einen Gegenstand für Details.', {
         fontFamily: 'Georgia, serif',
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#dce6f5',
         align: 'center',
-        wordWrap: { width: width - 80 },
+        wordWrap: { width: width - 90 },
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5)
+      .setDepth(11);
 
     this.add
-      .text(width / 2, height - 14, 'Klick: ausrüsten / in Hotbar legen     [E] oder [Esc]: schließen', {
+      .text(width / 2, height - 16, 'Klick: ausrüsten / in Hotbar legen     [E] oder [Esc]: schließen', {
         fontFamily: 'Courier New',
-        fontSize: '10px',
-        color: '#9fb0c9',
+        fontSize: '9px',
+        color: '#93a0c2',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(11);
 
     this.input.keyboard.on('keydown-E', () => this.close());
     this.input.keyboard.on('keydown-ESC', () => this.close());
@@ -81,51 +85,31 @@ export default class InventoryScene extends Phaser.Scene {
     this.render();
   }
 
-  labelStyle() {
-    return { fontFamily: 'Courier New', fontSize: '10px', color: '#9fb0c9' };
+  label(x, y, text, align = 'center') {
+    return this.add
+      .text(x, y, text, { fontFamily: 'Courier New', fontSize: '9px', color: '#93a0c2', letterSpacing: 1 })
+      .setOrigin(align === 'left' ? 0 : 0.5, 0.5)
+      .setDepth(11);
   }
 
-  makeSlot(x, y, onClick) {
-    const bg = this.add.rectangle(x, y, SLOT, SLOT, 0x2f3850, 1).setStrokeStyle(1, 0x4a5578);
-    const icon = this.add.image(x, y, 'whitepx').setVisible(false).setDisplaySize(SLOT - 10, SLOT - 10);
-    const qty = this.add
-      .text(x + SLOT / 2 - 3, y + SLOT / 2 - 3, '', { fontFamily: 'Courier New', fontSize: '10px', color: '#fff6d8', stroke: '#000', strokeThickness: 3 })
-      .setOrigin(1, 1)
-      .setVisible(false);
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerdown', onClick);
-    bg.on('pointerover', () => {
-      bg.setStrokeStyle(2, 0xf5cf4a);
-      this.showDetailFor(icon.itemId);
-    });
-    bg.on('pointerout', () => bg.setStrokeStyle(1, 0x4a5578));
-    return { bg, icon, qty };
+  makeInventorySlot(x, y, onClick) {
+    const slot = makeSlot(this, x, y, SLOT, { depth: 10, onClick });
+    slot.qty = qtyBadge(this, x - SLOT / 2, y - SLOT / 2, SLOT, 10);
+    slot.hit.on('pointerover', () => this.showDetailFor(slot.icon.itemId));
+    slot.hit.on('pointerout', () => this.detailText.setText(''));
+    return slot;
   }
 
   showDetailFor(id) {
     const def = ITEMS[id];
-    this.detailText.setText(def ? `${def.name} - ${def.desc}` : '');
-  }
-
-  setSlotItem(slot, entry) {
-    const id = typeof entry === 'string' ? entry : entry?.id;
-    const qty = typeof entry === 'string' ? 1 : entry?.qty ?? 1;
-    if (id && ITEMS[id]) {
-      slot.icon.setTexture(ITEMS[id].texture).setVisible(true).setDisplaySize(SLOT - 12, SLOT - 12);
-      slot.icon.itemId = id;
-      slot.qty.setText(qty > 1 ? String(qty) : '').setVisible(qty > 1);
-    } else {
-      slot.icon.setVisible(false);
-      slot.icon.itemId = null;
-      slot.qty.setVisible(false);
-    }
+    this.detailText.setText(def ? `${def.name} — ${def.desc}` : '');
   }
 
   render() {
-    this.setSlotItem(this.weaponSlot, this.inventory.weapon);
-    this.setSlotItem(this.armorSlot, this.inventory.armor);
-    this.hotbarSlots.forEach((slot, i) => this.setSlotItem(slot, this.inventory.hotbar[i]));
-    this.backpackSlots.forEach((slot, i) => this.setSlotItem(slot, this.inventory.backpack[i] ?? null));
+    setSlotItem(this.weaponSlot, this.inventory.weapon, ITEMS);
+    setSlotItem(this.armorSlot, this.inventory.armor, ITEMS);
+    this.hotbarSlots.forEach((slot, i) => setSlotItem(slot, this.inventory.hotbar[i], ITEMS));
+    this.backpackSlots.forEach((slot, i) => setSlotItem(slot, this.inventory.backpack[i] ?? null, ITEMS));
   }
 
   onEquipClick(kind) {

@@ -17,6 +17,11 @@ export default class SailingScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, worldW, worldH);
 
     this.water = this.add.tileSprite(0, 0, worldW, worldH, 'tile_water').setOrigin(0, 0);
+    this.waterShimmer = this.add
+      .tileSprite(0, 0, worldW, worldH, 'tile_water')
+      .setOrigin(0, 0)
+      .setAlpha(0.3)
+      .setBlendMode(Phaser.BlendModes.ADD);
 
     this.boat = this.physics.add.sprite(160, 160, 'boat').setScale(1.15);
     this.boat.setDamping(true);
@@ -83,6 +88,8 @@ export default class SailingScene extends Phaser.Scene {
   update(time, delta) {
     this.water.tilePositionX += delta * 0.015;
     this.water.tilePositionY += delta * 0.01;
+    this.waterShimmer.tilePositionX -= delta * 0.025;
+    this.waterShimmer.tilePositionY += delta * 0.018;
 
     const k = this.keys;
     const accel = 190;

@@ -1,4 +1,5 @@
 import { ITEMS } from './Items.js';
+import { savePlayerState } from './PlayerState.js';
 
 const BACKPACK_SIZE = 12;
 const HOTBAR_SIZE = 4;
@@ -18,6 +19,7 @@ export default class Inventory {
 
   emitChanged() {
     this.scene.events.emit('inventoryChanged', this);
+    savePlayerState(this.player);
   }
 
   // Try the hotbar first (for consumables/throwables/trinkets), then the

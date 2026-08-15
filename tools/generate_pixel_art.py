@@ -108,89 +108,114 @@ def save(img, name, scale=1):
 # ---------------------------------------------------------------------------
 # palette
 # ---------------------------------------------------------------------------
-SKIN = (242, 193, 141, 255)
-SKIN_SH = (216, 158, 104, 255)
-TUNIC = (196, 60, 48, 255)
-TUNIC_SH = (146, 36, 30, 255)
-TUNIC_HI = (222, 96, 78, 255)
-BELT = (108, 66, 34, 255)
-STEEL = (196, 202, 212, 255)
-STEEL_SH = (138, 145, 156, 255)
-STEEL_HI = (232, 236, 242, 255)
-ARMOR = (140, 148, 158, 255)
-ARMOR_SH = (95, 102, 112, 255)
-ARMOR_HI = (176, 183, 192, 255)
-WOOD = (140, 90, 43, 255)
-WOOD_SH = (98, 60, 26, 255)
-WOOD_HI = (176, 122, 68, 255)
-LEATHER = (92, 58, 30, 255)
+# Bumped saturation/contrast across the board vs. the original muted-medieval
+# set - richer, cleaner-reading colour blocks (closer to a Pokemon-overworld
+# "storybook" register) while keeping the outline+3-tone shading recipe that
+# lets it still read as detailed pixel art rather than flat cartoon fills.
+SKIN = (255, 205, 148, 255)
+SKIN_SH = (230, 164, 104, 255)
+SKIN_HI = (255, 226, 190, 255)
+TUNIC = (214, 48, 42, 255)
+TUNIC_SH = (156, 24, 26, 255)
+TUNIC_HI = (240, 92, 68, 255)
+BELT = (120, 72, 34, 255)
+STEEL = (206, 216, 232, 255)
+STEEL_SH = (140, 152, 176, 255)
+STEEL_HI = (244, 248, 255, 255)
+ARMOR = (150, 162, 184, 255)
+ARMOR_SH = (94, 106, 130, 255)
+ARMOR_HI = (196, 206, 224, 255)
+WOOD = (156, 98, 44, 255)
+WOOD_SH = (108, 64, 26, 255)
+WOOD_HI = (198, 138, 72, 255)
+LEATHER = (104, 64, 32, 255)
 
 # Eisenklamm (mine/fortress island) palette
-IRON = (90, 96, 106, 255)
-IRON_SH = (58, 62, 70, 255)
-IRON_HI = (138, 144, 154, 255)
-IRON_DARK = (52, 54, 60, 255)
-IRON_DARK_SH = (34, 36, 40, 255)
-GOBLIN_SKIN = (122, 152, 82, 255)
-GOBLIN_SKIN_SH = (86, 112, 54, 255)
+IRON = (94, 102, 118, 255)
+IRON_SH = (58, 64, 78, 255)
+IRON_HI = (150, 160, 182, 255)
+IRON_DARK = (52, 56, 68, 255)
+IRON_DARK_SH = (32, 35, 44, 255)
+GOBLIN_SKIN = (132, 172, 88, 255)
+GOBLIN_SKIN_SH = (90, 124, 56, 255)
 FUSE_BLACK = (34, 32, 30, 255)
-BRASS = (176, 144, 60, 255)
-BRASS_SH = (128, 100, 38, 255)
+BRASS = (206, 168, 66, 255)
+BRASS_SH = (150, 116, 40, 255)
+
+# Shared ground/water/decoration palette - defined up top so both the tiles
+# and the sailing-map island art (further down) draw from one source.
+GRASS = (86, 184, 68, 255)
+GRASS_SH = (58, 148, 48, 255)
+GRASS_HI = (128, 214, 96, 255)
+SAND = (244, 218, 148, 255)
+SAND_SH = (216, 186, 120, 255)
+SAND_HI = (255, 238, 190, 255)
+WATER = (46, 138, 214, 255)
+WATER_SH = (28, 96, 168, 255)
+WATER_HI = (120, 200, 244, 255)
+FOAM = (232, 248, 255, 255)
 
 
 # ---------------------------------------------------------------------------
 # PLAYER
 # ---------------------------------------------------------------------------
 def make_player():
-    img = canvas(30, 38)
-    cx = 15
+    img = canvas(32, 39)
+    cx = 16
     # shadow
-    ellipse(img, cx - 9, 32, cx + 9, 36, (10, 10, 10, 80))
+    ellipse(img, cx - 9, 33, cx + 9, 37, (10, 10, 10, 80))
     # flowing cape (behind body, wider + longer than before)
-    polygon(img, [(cx - 9, 12), (cx - 13, 30), (cx - 8, 33), (cx - 4, 26), (cx - 6, 14)], (150, 30, 26, 255))
-    polygon(img, [(cx - 9, 12), (cx - 13, 30), (cx - 10, 31), (cx - 7, 14)], TUNIC_SH)
+    polygon(img, [(cx - 9, 12), (cx - 14, 31), (cx - 8, 34), (cx - 4, 27), (cx - 6, 14)], (150, 30, 26, 255))
+    polygon(img, [(cx - 9, 12), (cx - 14, 31), (cx - 10, 32), (cx - 7, 14)], TUNIC_SH)
+    d(img).line([(cx - 11, 18), (cx - 9, 26)], fill=TUNIC_HI, width=1)  # cape fold highlight
     # legs / boots
-    rect(img, cx - 6, 24, cx - 2, 32, LEATHER)
-    rect(img, cx + 2, 24, cx + 6, 32, LEATHER)
-    rect(img, cx - 6, 29, cx - 2, 32, (58, 38, 20, 255))
-    rect(img, cx + 2, 29, cx + 6, 32, (58, 38, 20, 255))
-    rect(img, cx - 6, 31, cx - 2, 32, (30, 20, 12, 255))
-    rect(img, cx + 2, 31, cx + 6, 32, (30, 20, 12, 255))
+    rect(img, cx - 6, 25, cx - 2, 33, LEATHER)
+    rect(img, cx + 2, 25, cx + 6, 33, LEATHER)
+    rect(img, cx - 6, 30, cx - 2, 33, (58, 38, 20, 255))
+    rect(img, cx + 2, 30, cx + 6, 33, (58, 38, 20, 255))
+    rect(img, cx - 6, 32, cx - 2, 33, (30, 20, 12, 255))
+    rect(img, cx + 2, 32, cx + 6, 33, (30, 20, 12, 255))
     # tunic body
-    rect(img, cx - 8, 13, cx + 8, 26, TUNIC)
-    shade_right(img, cx - 8, 13, cx + 8, 26, TUNIC_SH, 0.35)
-    rect(img, cx - 8, 13, cx + 8, 15, TUNIC_HI)
+    rect(img, cx - 8, 14, cx + 8, 27, TUNIC)
+    shade_right(img, cx - 8, 14, cx + 8, 27, TUNIC_SH, 0.35)
+    rect(img, cx - 8, 14, cx + 8, 16, TUNIC_HI)
+    d(img).line([(cx - 5, 17), (cx - 5, 24)], fill=TUNIC_SH, width=1)  # fabric fold
+    d(img).line([(cx + 5, 17), (cx + 5, 24)], fill=TUNIC_SH, width=1)
     # small crest/emblem on the chest
-    polygon(img, [(cx - 2, 17), (cx + 2, 17), (cx + 2, 21), (cx, 23), (cx - 2, 21)], (232, 196, 70, 255))
-    rect(img, cx - 1, 18, cx, 20, (196, 60, 48, 255))
+    polygon(img, [(cx - 2, 18), (cx + 2, 18), (cx + 2, 22), (cx, 24), (cx - 2, 22)], (232, 196, 70, 255))
+    rect(img, cx - 1, 19, cx, 21, TUNIC)
     # belt
-    rect(img, cx - 8, 21, cx + 8, 23, BELT)
-    rect(img, cx - 2, 21, cx + 1, 23, (216, 184, 70, 255))
+    rect(img, cx - 8, 22, cx + 8, 24, BELT)
+    rect(img, cx - 2, 22, cx + 1, 24, (216, 184, 70, 255))
     # arms
-    rect(img, cx - 12, 14, cx - 9, 22, SKIN)
-    rect(img, cx + 9, 14, cx + 12, 22, SKIN)
-    rect(img, cx - 12, 18, cx - 9, 22, SKIN_SH)
-    rect(img, cx + 9, 18, cx + 12, 22, SKIN_SH)
-    # neck + head
-    rect(img, cx - 3, 9, cx + 3, 12, SKIN)
-    ellipse(img, cx - 8, -2, cx + 8, 13, SKIN)
-    shade_bottom(img, cx - 8, -2, cx + 8, 13, SKIN_SH, 0.28)
+    rect(img, cx - 12, 15, cx - 9, 23, SKIN)
+    rect(img, cx + 9, 15, cx + 12, 23, SKIN)
+    rect(img, cx - 12, 19, cx - 9, 23, SKIN_SH)
+    rect(img, cx + 9, 19, cx + 12, 23, SKIN_SH)
+    # neck + head (bumped up ~15% for a friendlier, slightly chibi read)
+    rect(img, cx - 3, 9, cx + 3, 13, SKIN)
+    ellipse(img, cx - 9, -3, cx + 9, 14, SKIN)
+    shade_bottom(img, cx - 9, -3, cx + 9, 14, SKIN_SH, 0.26)
+    highlight_dot(img, cx - 6, 0, SKIN_HI, 3, 2)
     # helmet with a small plume
-    polygon(img, [(cx - 1, -10), (cx + 3, -12), (cx + 2, -6), (cx - 1, -6)], (196, 60, 48, 255))
-    polygon(img, [(cx - 9, 2), (cx + 9, 2), (cx + 7, -4), (cx - 7, -4)], STEEL)
-    rect(img, cx - 9, 1, cx + 9, 6, STEEL)
-    rect(img, cx - 9, 5, cx + 9, 7, STEEL_SH)
-    rect(img, cx - 9, -4, cx + 9, -2, STEEL_HI)
-    rect(img, cx - 1, 2, cx + 1, 9, STEEL_SH)  # nose guard
-    ellipse(img, cx - 10, 3, cx - 7, 8, ARMOR)  # ear guards
-    ellipse(img, cx + 7, 3, cx + 10, 8, ARMOR)
+    polygon(img, [(cx - 1, -11), (cx + 3, -13), (cx + 2, -7), (cx - 1, -7)], TUNIC)
+    polygon(img, [(cx - 10, 2), (cx + 10, 2), (cx + 8, -5), (cx - 8, -5)], STEEL)
+    rect(img, cx - 10, 1, cx + 10, 6, STEEL)
+    rect(img, cx - 10, 5, cx + 10, 7, STEEL_SH)
+    rect(img, cx - 10, -5, cx + 10, -3, STEEL_HI)
+    highlight_dot(img, cx - 6, -3, (255, 255, 255, 200), 3, 1)  # helmet shine
+    rect(img, cx - 1, 2, cx + 1, 10, STEEL_SH)  # nose guard
+    ellipse(img, cx - 11, 3, cx - 8, 9, ARMOR)  # ear guards
+    ellipse(img, cx + 8, 3, cx + 11, 9, ARMOR)
     # eyes + brows + blush
     rect(img, cx - 5, 4, cx - 3, 5, (60, 40, 26, 255))
     rect(img, cx + 3, 4, cx + 5, 5, (60, 40, 26, 255))
     rect(img, cx - 5, 6, cx - 3, 7, (40, 26, 18, 255))
     rect(img, cx + 3, 6, cx + 5, 7, (40, 26, 18, 255))
-    highlight_dot(img, cx - 7, 8, (232, 140, 120, 140), 2, 1)
-    highlight_dot(img, cx + 5, 8, (232, 140, 120, 140), 2, 1)
+    highlight_dot(img, cx - 4, 6, (255, 255, 255, 200), 1, 1)
+    highlight_dot(img, cx + 4, 6, (255, 255, 255, 200), 1, 1)
+    highlight_dot(img, cx - 7, 9, (232, 140, 120, 150), 2, 1)
+    highlight_dot(img, cx + 5, 9, (232, 140, 120, 150), 2, 1)
     return img
 
 
@@ -599,6 +624,67 @@ def make_flowers():
     return img
 
 
+def make_mushroom():
+    img = canvas(14, 14)
+    ellipse(img, 4, 9, 10, 14, (232, 224, 210, 255))
+    ellipse(img, 1, 2, 13, 11, (214, 66, 56, 255))
+    shade_bottom(img, 1, 2, 13, 11, (166, 40, 36, 255), 0.35)
+    for sx, sy in ((3, 4), (8, 3), (10, 7), (5, 7)):
+        highlight_dot(img, sx, sy, (250, 240, 226, 255), 2, 2)
+    return img
+
+
+def make_reeds():
+    img = canvas(20, 30)
+    for bx, lean, h in ((3, 2, 26), (8, -1, 30), (13, 3, 24), (17, -2, 27)):
+        d(img).line([(bx, 30), (bx + lean, 30 - h)], fill=(74, 132, 58, 255), width=2)
+        d(img).line([(bx, 30), (bx + lean // 2, 30 - h + 4)], fill=(96, 162, 74, 255), width=1)
+    ellipse(img, 6, 2, 10, 10, (120, 84, 46, 255))  # cattail head
+    shade_bottom(img, 6, 2, 10, 10, (92, 62, 32, 255), 0.4)
+    return img
+
+
+def make_driftwood():
+    img = canvas(30, 12)
+    polygon(img, [(1, 8), (24, 2), (29, 5), (6, 11)], (156, 132, 100, 255))
+    shade_bottom(img, 1, 2, 29, 11, (112, 92, 68, 255), 0.4)
+    for lx in (8, 16, 22):
+        d(img).line([(lx, 4), (lx - 3, 9)], fill=(112, 92, 68, 255), width=1)
+    return img
+
+
+def make_seashell():
+    img = canvas(12, 10)
+    polygon(img, [(6, 0), (11, 8), (6, 10), (1, 8)], (250, 224, 196, 255))
+    shade_bottom(img, 1, 0, 11, 10, (222, 182, 150, 255), 0.4)
+    for lx in (4, 6, 8):
+        d(img).line([(6, 1), (lx, 8)], fill=(222, 182, 150, 255), width=1)
+    highlight_dot(img, 5, 2, (255, 245, 232, 220), 2, 2)
+    return img
+
+
+def make_tidepool():
+    img = canvas(26, 16)
+    ellipse(img, 0, 2, 26, 16, (150, 120, 90, 255))
+    ellipse(img, 2, 4, 24, 14, WATER)
+    ellipse(img, 4, 5, 20, 11, WATER_HI)
+    highlight_dot(img, 8, 6, (255, 255, 255, 160), 2, 1)
+    return img
+
+
+def make_butterfly():
+    img = canvas(14, 12)
+    cx = 7
+    d(img).line([(cx, 2), (cx, 10)], fill=(40, 30, 20, 255), width=1)
+    ellipse(img, cx - 7, 0, cx - 1, 6, (232, 150, 60, 255))
+    ellipse(img, cx + 1, 0, cx + 7, 6, (232, 150, 60, 255))
+    ellipse(img, cx - 6, 5, cx - 1, 10, (214, 90, 130, 255))
+    ellipse(img, cx + 1, 5, cx + 6, 10, (214, 90, 130, 255))
+    highlight_dot(img, cx - 4, 2, (255, 224, 160, 220), 1, 1)
+    highlight_dot(img, cx + 3, 2, (255, 224, 160, 220), 1, 1)
+    return img
+
+
 PINE = (48, 96, 66, 255)
 PINE_SH = (32, 72, 48, 255)
 PINE_HI = (78, 132, 92, 255)
@@ -745,23 +831,57 @@ def make_veggie():
 
 
 # ---------------------------------------------------------------------------
-# BOAT
+# BOAT — "Die Fromme Ente" (The Pious Duck), so the figurehead is, in fact,
+# a duck.
 # ---------------------------------------------------------------------------
+DUCK_BILL = (232, 160, 40, 255)
+
+
 def make_boat():
-    img = canvas(46, 60)
-    cx = 23
-    polygon(img, [(4, 40), (42, 40), (32, 56), (14, 56)], WOOD)
-    polygon(img, [(23, 40), (42, 40), (32, 56), (23, 56)], WOOD_SH)
-    rect(img, 3, 32, 43, 41, WOOD_HI)
-    rect(img, 3, 36, 43, 41, WOOD)
-    rect(img, cx - 2, 4, cx + 2, 36, (94, 60, 26, 255))
-    rect(img, cx, 4, cx + 2, 36, (66, 42, 18, 255))
-    polygon(img, [(cx + 2, 6), (cx + 2, 32), (cx + 20, 24)], (238, 230, 210, 255))
-    polygon(img, [(cx + 2, 20), (cx + 2, 32), (cx + 20, 24)], (208, 198, 176, 255))
-    d(img).line([(cx + 2, 12), (cx + 15, 15)], fill=(180, 170, 150, 255), width=1)
-    d(img).line([(cx + 2, 22), (cx + 17, 23)], fill=(180, 170, 150, 255), width=1)
-    polygon(img, [(cx - 2, 4), (cx + 6, 4), (cx + 2, 10)], (196, 60, 48, 255))
-    ellipse(img, 22, 38, 30, 42, WOOD_SH)  # little carved figurehead nub
+    img = canvas(52, 68)
+    cx = 26
+
+    # hull, wider + more plank detail than before
+    polygon(img, [(3, 42), (49, 42), (37, 62), (15, 62)], WOOD)
+    polygon(img, [(cx, 42), (49, 42), (37, 62), (cx, 62)], WOOD_SH)
+    for py in (46, 50, 54, 58):
+        d(img).line([(6, py), (46, py)], fill=WOOD_SH, width=1)
+    rect(img, 2, 34, 50, 43, WOOD_HI)
+    rect(img, 2, 38, 50, 43, WOOD)
+    for gx in range(6, 48, 6):
+        d(img).line([(gx, 34), (gx, 42)], fill=WOOD_SH, width=1)
+    # gunwale trim
+    rect(img, 2, 33, 50, 35, (206, 150, 82, 255))
+
+    # mast + boom
+    rect(img, cx - 2, 3, cx + 2, 38, (108, 70, 30, 255))
+    rect(img, cx, 3, cx + 2, 38, (74, 46, 20, 255))
+    rect(img, cx - 16, 30, cx + 18, 33, WOOD_SH)
+
+    # big sail with a crest emblem (echoes Ruediger's chest crest)
+    polygon(img, [(cx + 2, 6), (cx + 2, 33), (cx + 24, 25)], (246, 240, 224, 255))
+    polygon(img, [(cx + 2, 20), (cx + 2, 33), (cx + 24, 25)], (218, 208, 186, 255))
+    for ly, lx in ((11, 14), (17, 18), (23, 21), (29, 17)):
+        d(img).line([(cx + 2, ly), (cx + lx, ly + 2)], fill=(190, 180, 156, 255), width=1)
+    polygon(img, [(cx + 9, 14), (cx + 13, 14), (cx + 13, 18), (cx + 11, 20), (cx + 9, 18)], (232, 196, 70, 255))
+    rect(img, cx + 10, 15, cx + 12, 17, TUNIC)
+
+    # rigging ropes from mast top to bow/stern
+    d(img).line([(cx, 4), (6, 33)], fill=(176, 156, 120, 255), width=1)
+    d(img).line([(cx, 4), (46, 40)], fill=(176, 156, 120, 255), width=1)
+
+    # pennant flag at the masthead
+    polygon(img, [(cx + 2, 1), (cx + 13, 4), (cx + 2, 7)], TUNIC)
+    polygon(img, [(cx + 2, 1), (cx + 8, 3), (cx + 2, 5)], TUNIC_HI)
+
+    # carved duck-head figurehead at the bow
+    fx, fy = 26, 40
+    ellipse(img, fx - 6, fy - 6, fx + 6, fy + 6, (250, 236, 130, 255))
+    shade_bottom(img, fx - 6, fy - 6, fx + 6, fy + 6, (214, 196, 90, 255), 0.4)
+    ellipse(img, fx - 3, fy - 10, fx + 5, fy - 3, (250, 236, 130, 255))
+    polygon(img, [(fx + 3, fy - 8), (fx + 11, fy - 7), (fx + 3, fy - 5)], DUCK_BILL)
+    highlight_dot(img, fx - 1, fy - 8, (40, 30, 15, 255), 1, 1)
+    ellipse(img, fx - 8, fy + 4, fx + 8, fy + 10, WOOD_SH)  # neck taper into hull
     return img
 
 
@@ -907,39 +1027,64 @@ def speckle(img, positions, color):
 
 
 def make_tile_grass():
-    img = tile_base((79, 168, 61, 255))
-    speckle(img, [(3, 5, 3, 2), (18, 3, 2, 2), (9, 14, 3, 2), (24, 12, 3, 2),
-                  (14, 22, 2, 2), (27, 24, 3, 2), (4, 20, 2, 2), (20, 27, 3, 2)],
-            (60, 138, 45, 255))
-    speckle(img, [(11, 8, 2, 2), (26, 19, 2, 2), (6, 27, 2, 2)], (108, 196, 78, 255))
+    img = tile_base(GRASS)
+    # small blade-tuft clumps instead of flat dot speckles, for a less
+    # uniform, more "growing" look up close
+    tufts = [(3, 6), (18, 4), (9, 15), (25, 12), (14, 23), (27, 25), (4, 21), (20, 28), (30, 18)]
+    for tx, ty in tufts:
+        d(img).line([(tx, ty), (tx - 1, ty - 3)], fill=GRASS_SH, width=1)
+        d(img).line([(tx + 2, ty), (tx + 1, ty - 4)], fill=GRASS_SH, width=1)
+        d(img).line([(tx + 1, ty), (tx + 1, ty - 2)], fill=GRASS_HI, width=1)
+    speckle(img, [(11, 8, 2, 2), (26, 19, 2, 2), (6, 27, 2, 2), (16, 2, 2, 2)], GRASS_HI)
+    speckle(img, [(1, 12, 1, 1), (22, 2, 1, 1), (30, 9, 1, 1)], GRASS_SH)
     return img.crop((0, 0, 32, 32))
 
 
 def make_tile_path():
-    img = tile_base((156, 116, 68, 255))
+    img = tile_base((172, 130, 78, 255))
     speckle(img, [(4, 7, 2, 2), (17, 15, 2, 2), (10, 24, 2, 2), (24, 5, 2, 2),
-                  (21, 22, 2, 2), (7, 18, 2, 2)], (122, 88, 48, 255))
+                  (21, 22, 2, 2), (7, 18, 2, 2)], (136, 100, 56, 255))
     speckle(img, [(9, 12, 1, 1), (23, 10, 1, 1), (14, 27, 1, 1), (28, 20, 1, 1)],
-            (186, 148, 92, 255))
+            (206, 166, 104, 255))
+    speckle(img, [(2, 2, 1, 1), (30, 30, 1, 1), (15, 8, 1, 1)], (98, 70, 38, 255))
     return img.crop((0, 0, 32, 32))
 
 
 def make_tile_sand():
-    img = tile_base((236, 217, 164, 255))
+    img = tile_base(SAND)
     speckle(img, [(5, 8, 1, 1), (20, 5, 1, 1), (12, 18, 1, 1), (25, 22, 1, 1),
                   (3, 24, 1, 1), (17, 27, 1, 1), (28, 10, 1, 1), (9, 3, 1, 1)],
-            (210, 186, 128, 255))
-    speckle(img, [(16, 12, 1, 1), (8, 27, 1, 1), (24, 16, 1, 1)], (250, 240, 202, 255))
+            SAND_SH)
+    speckle(img, [(16, 12, 1, 1), (8, 27, 1, 1), (24, 16, 1, 1)], SAND_HI)
+    # a couple of tiny shell/pebble flecks for beach texture
+    highlight_dot(img, 21, 19, (255, 250, 240, 220), 2, 1)
+    highlight_dot(img, 6, 14, (200, 172, 150, 255), 2, 2)
     return img.crop((0, 0, 32, 32))
 
 
 def make_tile_water():
-    img = tile_base((60, 118, 190, 255))
-    rect(img, 0, 6, 31, 7, (86, 148, 218, 255))
-    rect(img, 0, 18, 31, 19, (86, 148, 218, 255))
-    rect(img, 0, 26, 31, 27, (44, 96, 164, 255))
-    speckle(img, [(6, 12, 4, 1), (20, 24, 4, 1), (14, 2, 4, 1)], (140, 190, 232, 255))
+    img = tile_base(WATER)
+    rect(img, 0, 4, 31, 5, WATER_HI)
+    rect(img, 0, 16, 31, 17, WATER_HI)
+    rect(img, 0, 27, 31, 28, WATER_SH)
+    rect(img, 0, 10, 31, 10, WATER_SH)
+    rect(img, 0, 22, 31, 22, WATER_SH)
+    speckle(img, [(6, 12, 4, 1), (20, 24, 4, 1), (14, 2, 4, 1), (24, 8, 3, 1), (2, 19, 3, 1)],
+            (170, 220, 250, 220))
+    highlight_dot(img, 9, 5, (255, 255, 255, 160), 2, 1)
+    highlight_dot(img, 27, 17, (255, 255, 255, 140), 2, 1)
     return img.crop((0, 0, 32, 32))
+
+
+def make_tile_foam():
+    # a transparent, tileable wave-crest strip laid along coastlines and
+    # scrolled at runtime for a lapping-tide effect
+    img = canvas(32, 16)
+    d(img).line([(0, 6), (6, 3), (12, 7), (18, 3), (24, 7), (30, 3)], fill=FOAM, width=2)
+    d(img).line([(0, 9), (6, 6), (12, 10), (18, 6), (24, 10), (30, 6)], fill=(255, 255, 255, 150), width=1)
+    for bx, by in ((4, 11), (14, 12), (22, 10), (28, 12), (9, 13)):
+        highlight_dot(img, bx, by, (255, 255, 255, 130), 2, 2)
+    return img
 
 
 def make_tile_wall():
@@ -988,17 +1133,57 @@ def make_tile_stone_path():
 # ---------------------------------------------------------------------------
 # SAILING-MAP ISLAND LANDMASSES (each visually distinct)
 # ---------------------------------------------------------------------------
+def jitter_polygon(points, cx, cy, amount, seed=0):
+    """Push each vertex slightly in/out from the shape centroid using a cheap
+    deterministic pseudo-noise (sin of an integer seed), for a hand-drawn,
+    less-geometric coastline than raw straight polygon points."""
+    out = []
+    for i, (x, y) in enumerate(points):
+        n = math.sin(i * 12.9898 + seed * 78.233) * 43758.5453
+        wobble = (n - math.floor(n)) * 2 - 1  # deterministic pseudo-random in [-1, 1]
+        dx, dy = x - cx, y - cy
+        dist = math.hypot(dx, dy) or 1
+        ux, uy = dx / dist, dy / dist
+        out.append((x + ux * amount * wobble, y + uy * amount * wobble))
+    return out
+
+
+def outward_ring(points, cx, cy, base, variance, seed=0):
+    """Like jitter_polygon, but always displaces outward (away from the
+    shape centroid) by base +/- variance - guarantees a ring that traces
+    just OUTSIDE the coastline instead of sometimes cutting back inside it."""
+    out = []
+    for i, (x, y) in enumerate(points):
+        n = math.sin(i * 12.9898 + seed * 78.233) * 43758.5453
+        wobble = n - math.floor(n)  # deterministic pseudo-random in [0, 1]
+        dx, dy = x - cx, y - cy
+        dist = math.hypot(dx, dy) or 1
+        ux, uy = dx / dist, dy / dist
+        push = base + variance * wobble
+        out.append((x + ux * push, y + uy * push))
+    return out
+
+
+def foam_ring(img, points, color=FOAM, width=2):
+    d(img).line(points + [points[0]], fill=(255, 255, 255, 100), width=width + 3, joint="curve")
+    d(img).line(points + [points[0]], fill=color, width=width, joint="curve")
+
+
 def make_island_rubenfeld():
     img = canvas(170, 130)
-    beach = [(20, 55), (35, 25), (75, 10), (120, 14), (152, 40), (160, 72),
-             (140, 105), (95, 122), (50, 116), (18, 90)]
-    grass = [(30, 55), (42, 32), (76, 20), (115, 23), (144, 42), (150, 70),
-             (132, 97), (94, 111), (54, 105), (28, 84)]
-    polygon(img, beach, (228, 205, 148, 255))
-    polygon(img, grass, (86, 172, 64, 255))
+    cx, cy = 88, 65
+    beach = jitter_polygon(
+        [(20, 55), (35, 25), (75, 10), (120, 14), (152, 40), (160, 72),
+         (140, 105), (95, 122), (50, 116), (18, 90)], cx, cy, 9, seed=1)
+    grass = jitter_polygon(
+        [(30, 55), (42, 32), (76, 20), (115, 23), (144, 42), (150, 70),
+         (132, 97), (94, 111), (54, 105), (28, 84)], cx, cy, 7, seed=2)
+    polygon(img, beach, SAND)
+    polygon(img, grass, GRASS)
+    foam_ring(img, outward_ring(beach, cx, cy, 3, 4, seed=3), width=2)
     speckle(img, [(50, 50, 5, 4), (90, 40, 5, 4), (70, 80, 5, 4), (110, 70, 5, 4),
-                  (60, 95, 4, 3), (120, 50, 4, 3)], (66, 148, 46, 255))
-    speckle(img, [(45, 70, 3, 3), (100, 90, 3, 3)], (112, 198, 82, 255))
+                  (60, 95, 4, 3), (120, 50, 4, 3)], GRASS_SH)
+    speckle(img, [(45, 70, 3, 3), (100, 90, 3, 3)], GRASS_HI)
     # tiny castle silhouette
     rect(img, 76, 42, 104, 62, (140, 148, 158, 255))
     rect(img, 76, 34, 84, 46, (120, 128, 138, 255))
@@ -1012,12 +1197,16 @@ def make_island_rubenfeld():
 
 def make_island_eisenklamm():
     img = canvas(180, 150)
-    shore = [(15, 90), (30, 55), (55, 30), (95, 12), (135, 10), (165, 35),
-             (172, 72), (155, 110), (120, 138), (75, 142), (35, 122)]
-    rock = [(28, 85), (42, 55), (62, 35), (96, 20), (130, 18), (156, 38),
-            (162, 70), (146, 102), (114, 126), (74, 130), (42, 112)]
+    cx, cy = 92, 76
+    shore = jitter_polygon(
+        [(15, 90), (30, 55), (55, 30), (95, 12), (135, 10), (165, 35),
+         (172, 72), (155, 110), (120, 138), (75, 142), (35, 122)], cx, cy, 9, seed=4)
+    rock = jitter_polygon(
+        [(28, 85), (42, 55), (62, 35), (96, 20), (130, 18), (156, 38),
+         (162, 70), (146, 102), (114, 126), (74, 130), (42, 112)], cx, cy, 7, seed=5)
     polygon(img, shore, (196, 190, 176, 255))
     polygon(img, rock, (128, 130, 134, 255))
+    foam_ring(img, outward_ring(shore, cx, cy, 3, 4, seed=6), width=2)
     # jagged mountain peaks
     peaks = [(50, 100), (66, 42), (82, 78), (100, 24), (118, 76), (136, 46), (150, 96)]
     polygon(img, peaks, (98, 100, 106, 255))
@@ -1033,14 +1222,18 @@ def make_island_eisenklamm():
 
 def make_island_moewenhort():
     img = canvas(170, 130)
-    shore = [(12, 60), (22, 32), (52, 14), (90, 10), (122, 20), (150, 15),
-             (162, 40), (155, 70), (168, 95), (140, 118), (100, 124),
-             (60, 120), (30, 100)]
-    sand = [(24, 58), (32, 36), (56, 22), (90, 19), (118, 27), (140, 24),
-            (150, 42), (144, 66), (152, 88), (130, 106), (98, 112),
-            (64, 108), (38, 90)]
+    cx, cy = 90, 66
+    shore = jitter_polygon(
+        [(12, 60), (22, 32), (52, 14), (90, 10), (122, 20), (150, 15),
+         (162, 40), (155, 70), (168, 95), (140, 118), (100, 124),
+         (60, 120), (30, 100)], cx, cy, 9, seed=7)
+    sand = jitter_polygon(
+        [(24, 58), (32, 36), (56, 22), (90, 19), (118, 27), (140, 24),
+         (150, 42), (144, 66), (152, 88), (130, 106), (98, 112),
+         (64, 108), (38, 90)], cx, cy, 7, seed=8)
     polygon(img, shore, (150, 148, 146, 255))
-    polygon(img, sand, (222, 198, 142, 255))
+    polygon(img, sand, SAND)
+    foam_ring(img, outward_ring(shore, cx, cy, 3, 4, seed=9), width=2)
     speckle(img, [(50, 50, 4, 3), (90, 40, 4, 3), (110, 80, 4, 3), (70, 90, 4, 3)],
             (196, 168, 108, 255))
     # rocky cliff outcrops
@@ -1092,6 +1285,12 @@ def main():
     save(make_pine_tree(), "pine_tree")
     save(make_mine_entrance(), "mine_entrance")
     save(make_grapple_hook(), "grapple_hook")
+    save(make_mushroom(), "mushroom")
+    save(make_reeds(), "reeds")
+    save(make_driftwood(), "driftwood")
+    save(make_seashell(), "seashell")
+    save(make_tidepool(), "tidepool")
+    save(make_butterfly(), "butterfly")
 
     for name, fn in (
         ("tile_grass", make_tile_grass),
@@ -1105,6 +1304,7 @@ def main():
     ):
         img = fn()
         img.save(os.path.join(OUT, f"{name}.png"))
+    make_tile_foam().save(os.path.join(OUT, "tile_foam.png"))
 
     # contact sheet for review
     names = ["player", "sword", "halberdier", "halberd", "goose", "chicken",
@@ -1115,8 +1315,9 @@ def main():
              "tree", "bush", "rock", "flowers",
              "elite_knight", "tower_shield", "pickaxe", "mine_goblin", "sapper", "bomb",
              "boss_grendal", "grendal_hammer", "pine_tree", "mine_entrance", "grapple_hook",
+             "mushroom", "reeds", "driftwood", "seashell", "tidepool", "butterfly",
              "tile_grass", "tile_path", "tile_sand", "tile_water", "tile_wall", "tile_floor",
-             "tile_stone", "tile_stone_path"]
+             "tile_stone", "tile_stone_path", "tile_foam"]
     cell = 96
     cols = 6
     rows = math.ceil(len(names) / cols)
