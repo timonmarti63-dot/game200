@@ -97,6 +97,13 @@ def highlight_dot(img, x, y, color, w=2, h=2):
     rect(img, x, y, x + w - 1, y + h - 1, color)
 
 
+def specular(img, x0, y0, x1, y1, width=2, color=(255, 255, 255, 210)):
+    """A short bright diagonal streak across a rounded metal/armor surface -
+    the "polished figurine" glossy-highlight look, layered on top of the
+    flatter 3-tone shading."""
+    d(img).line([(x0, y0), (x1, y1)], fill=color, width=width)
+
+
 def save(img, name, scale=1):
     img = crop_pad(outline(img), pad=1)
     if scale != 1:
@@ -247,6 +254,7 @@ def make_halberdier():
     rect(img, cx - 9, 13, cx + 9, 25, ARMOR)
     shade_right(img, cx - 9, 13, cx + 9, 25, ARMOR_SH, 0.35)
     rect(img, cx - 9, 13, cx + 9, 15, ARMOR_HI)
+    specular(img, cx - 4, 15, cx - 2, 22, width=2)
     # rivets
     for rx in (cx - 6, cx - 1, cx + 4):
         highlight_dot(img, rx, 19, ARMOR_SH, 1, 1)
@@ -257,6 +265,8 @@ def make_halberdier():
     ellipse(img, cx + 6, 11, cx + 13, 18, ARMOR)
     shade_bottom(img, cx - 13, 11, cx - 6, 18, ARMOR_SH, 0.4)
     shade_bottom(img, cx + 6, 11, cx + 13, 18, ARMOR_SH, 0.4)
+    highlight_dot(img, cx - 11, 12, (255, 255, 255, 170), 2, 1)
+    highlight_dot(img, cx + 8, 12, (255, 255, 255, 170), 2, 1)
     # arms/gauntlets
     rect(img, cx - 12, 15, cx - 9, 21, SKIN_SH)
     rect(img, cx + 9, 15, cx + 12, 21, SKIN_SH)
@@ -265,6 +275,7 @@ def make_halberdier():
     ellipse(img, cx - 8, 0, cx + 8, 13, STEEL)
     shade_bottom(img, cx - 8, 0, cx + 8, 13, STEEL_SH, 0.3)
     rect(img, cx - 8, -2, cx + 8, 2, STEEL_HI)
+    highlight_dot(img, cx - 5, -1, (255, 255, 255, 200), 3, 1)
     rect(img, cx - 8, 5, cx + 8, 7, (35, 35, 38, 255))  # visor slit
     highlight_dot(img, cx - 5, 5, (210, 60, 40, 255), 2, 2)
     highlight_dot(img, cx + 3, 5, (210, 60, 40, 255), 2, 2)
@@ -299,6 +310,7 @@ def make_elite_knight():
     rect(img, cx - 11, 14, cx + 11, 28, IRON)
     shade_right(img, cx - 11, 14, cx + 11, 28, IRON_SH, 0.35)
     rect(img, cx - 11, 14, cx + 11, 16, IRON_HI)
+    specular(img, cx + 2, 16, cx + 4, 23, width=2)
     for rx in (cx - 7, cx - 1, cx + 5):
         highlight_dot(img, rx, 21, IRON_SH, 1, 1)
     rect(img, cx - 11, 24, cx + 11, 26, IRON_DARK)
@@ -306,6 +318,7 @@ def make_elite_knight():
     rect(img, cx - 16, 14, cx - 11, 30, IRON_DARK)
     shade_right(img, cx - 16, 14, cx - 11, 30, IRON_DARK_SH, 0.4)
     rect(img, cx - 16, 14, cx - 11, 16, IRON_HI)
+    highlight_dot(img, cx - 15, 18, (255, 255, 255, 160), 2, 4)
     polygon(img, [(cx - 14, 8), (cx - 13, 12), (cx - 15, 12)], BRASS)
     # pauldrons - oversized, spiked
     ellipse(img, cx - 16, 10, cx - 6, 18, IRON)
@@ -734,9 +747,11 @@ def make_boss():
     for gy in (20, 26, 32):
         rect(img, cx - 17, gy, cx + 17, gy + 1, (94, 62, 26, 255))
     rect(img, cx - 17, 16, cx + 17, 19, (196, 148, 78, 255))
+    highlight_dot(img, cx - 13, 22, (232, 196, 130, 200), 4, 2)
     # turnip sticking out of the crate
     ellipse(img, cx - 4, 8, cx + 5, 18, (238, 232, 222, 255))
     shade_bottom(img, cx - 4, 8, cx + 5, 18, (200, 190, 170, 255), 0.35)
+    highlight_dot(img, cx - 2, 10, (255, 255, 255, 210), 2, 3)
     rect(img, cx - 1, 4, cx + 2, 10, (94, 150, 60, 255))
     # arms
     rect(img, cx - 22, 20, cx - 17, 30, SKIN)
@@ -781,12 +796,15 @@ def make_boss_grendal():
     for gy in (21, 27, 33):
         rect(img, cx - 18, gy, cx + 18, gy + 1, IRON_DARK)
     rect(img, cx - 18, 16, cx + 18, 19, IRON_HI)
+    specular(img, cx - 10, 19, cx - 7, 32, width=2)
     polygon(img, [(cx - 3, 16), (cx + 3, 16), (cx + 4, 23), (cx, 26), (cx - 4, 23)], BRASS)
     # spiked pauldrons
     ellipse(img, cx - 24, 12, cx - 6, 22, IRON)
     ellipse(img, cx + 6, 12, cx + 24, 22, IRON)
     shade_bottom(img, cx - 24, 12, cx - 6, 22, IRON_SH, 0.4)
     shade_bottom(img, cx + 6, 12, cx + 24, 22, IRON_SH, 0.4)
+    highlight_dot(img, cx - 20, 14, (255, 255, 255, 170), 3, 2)
+    highlight_dot(img, cx + 12, 14, (255, 255, 255, 170), 3, 2)
     for sx in (-20, -13, 13, 20):
         polygon(img, [(cx + sx - 3, 12), (cx + sx, 4), (cx + sx + 3, 12)], IRON_DARK)
     # arms
@@ -800,7 +818,12 @@ def make_boss_grendal():
     rect(img, cx - 14, 3, cx + 14, 7, (16, 16, 18, 255))  # visor slit
     highlight_dot(img, cx - 8, 4, (232, 90, 40, 255), 3, 3)
     highlight_dot(img, cx + 5, 4, (232, 90, 40, 255), 3, 3)
-    polygon(img, [(cx - 2, -13), (cx + 2, -13), (cx, -18)], BRASS)  # crest horn
+    # a duke's crown, worn straight over the great helm
+    rect(img, cx - 12, -12, cx + 12, -8, BRASS)
+    shade_bottom(img, cx - 12, -12, cx + 12, -8, BRASS_SH, 0.4)
+    for px in (-9, -3, 3, 9):
+        polygon(img, [(cx + px - 3, -12), (cx + px, -19), (cx + px + 3, -12)], BRASS)
+    highlight_dot(img, cx - 6, -18, (255, 240, 200, 220), 2, 2)
     polygon(img, [(cx - 10, -10), (cx - 6, -15), (cx - 4, -9)], IRON_SH)
     polygon(img, [(cx + 10, -10), (cx + 6, -15), (cx + 4, -9)], IRON_SH)
     return img
