@@ -465,13 +465,19 @@ export default class IslandScene extends Phaser.Scene {
     // damit sich Häuser nicht überlappen und Wege dazwischen sichtbar
     // bleiben. Reihen: Shops oben (r=6), Wohnhäuser Mitte (r=18/22),
     // Wirtshaus unten (r=32) - mit genügend Abstand.
+    //
+    // doorOffsetPx: die generierten Sprites haben die Tür nicht exakt
+    // in der Bildmitte. Wir verschieben den Sprite horizontal um diesen
+    // Wert (nach LINKS), damit die visuelle Tür genau über der
+    // Türkachel sitzt. Werte via Center-of-Mass über die Türfarbe im PNG
+    // gemessen; die meisten Türen sind bereits fast mittig (±6 px).
     const houses = [
-      { key: 'house_apothecary', col: 6,  row: 6,  footCols: 4, footRows: 5, scale: 1.0, shop: 'apothecary', label: 'Apotheke' },
-      { key: 'house_smith',      col: 20, row: 6,  footCols: 4, footRows: 5, scale: 1.0, shop: 'smith',      label: 'Schmiede' },
-      { key: 'house_cottage_a',  col: 5,  row: 18, footCols: 4, footRows: 5, scale: 1.0, interiorKind: 'cottage', label: 'Häuschen' },
-      { key: 'house_farm',       col: 13, row: 20, footCols: 4, footRows: 5, scale: 1.0, interiorKind: 'farm',    label: 'Bauernhof' },
-      { key: 'house_cottage_b',  col: 22, row: 18, footCols: 4, footRows: 5, scale: 1.0 },
-      { key: 'house_inn',        col: 14, row: 32, footCols: 5, footRows: 7, scale: 1.0, interiorKind: 'tavern', label: 'Wirtshaus' },
+      { key: 'house_apothecary', col: 6,  row: 6,  footCols: 4, footRows: 5, scale: 1.0, doorOffsetPx: 6,  shop: 'apothecary', label: 'Apotheke' },
+      { key: 'house_smith',      col: 20, row: 6,  footCols: 4, footRows: 5, scale: 1.0, doorOffsetPx: 6,  shop: 'smith',      label: 'Schmiede' },
+      { key: 'house_cottage_a',  col: 5,  row: 18, footCols: 4, footRows: 5, scale: 1.0, doorOffsetPx: 1,  interiorKind: 'cottage', label: 'Häuschen' },
+      { key: 'house_farm',       col: 13, row: 20, footCols: 4, footRows: 5, scale: 1.0, doorOffsetPx: -4, interiorKind: 'farm',    label: 'Bauernhof' },
+      { key: 'house_cottage_b',  col: 22, row: 18, footCols: 4, footRows: 5, scale: 1.0, doorOffsetPx: 0 },
+      { key: 'house_inn',        col: 14, row: 32, footCols: 5, footRows: 7, scale: 1.0, doorOffsetPx: 3,  interiorKind: 'tavern', label: 'Wirtshaus' },
     ];
 
     // Curved paths connecting well to key destinations.
@@ -496,7 +502,7 @@ export default class IslandScene extends Phaser.Scene {
     const vColBase = Math.floor(OFFSET / T);
     const vRowBase = Math.floor(OFFSET / T);
 
-    houses.forEach(({ key, col, row, footCols, footRows, scale = 2.6, shop, interiorKind, label }) => {
+    houses.forEach(({ key, col, row, footCols, footRows, scale = 2.6, doorOffsetPx = 0, shop, interiorKind, label }) => {
       const absCol = vColBase + col;
       const absRow = vRowBase + row;
       // Weltkoords der Türkachel (unten-mittig des Haus-Fussabdrucks).
@@ -513,11 +519,12 @@ export default class IslandScene extends Phaser.Scene {
       }
 
       // Sprite mit Origin (0.5, 1) am Sprite-Fuss ankern. Sprite-Fuss
-      // sitzt auf der Unterkante der Türkachel, sodass das Sprite genau
-      // die Türkachel-Zeile abdeckt und die Tür visuell direkt über der
-      // Standkachel gemalt wird.
+      // sitzt auf der Unterkante der Türkachel. doorOffsetPx * scale
+      // verschiebt den Sprite horizontal, damit die Tür im Bild direkt
+      // über der Türkachel liegt (Bild-Tür ist nicht immer mittig).
       const spriteBottomY = doorWorld.y + T / 2;
-      const img = this.add.image(doorWorld.x, spriteBottomY, key)
+      const spriteX = doorWorld.x - doorOffsetPx * scale;
+      const img = this.add.image(spriteX, spriteBottomY, key)
         .setOrigin(0.5, 1)
         .setScale(scale);
       img.setDepth(spriteBottomY - 1);
