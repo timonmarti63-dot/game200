@@ -48,6 +48,10 @@ export default class TutorialScene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.cameras.main.setBackgroundColor('#1b2a4a');
     this.page = 0;
+    // Phaser reuses this same Scene instance every time the tutorial is
+    // (re)played, so this must be reset here - otherwise replaying it via
+    // [T] after finishing it once leaves finish() permanently a no-op.
+    this.finished = false;
 
     this.panel = this.add.rectangle(width / 2, height / 2 - 6, width - 40, height - 74, 0x21283a, 0.92);
     this.panel.setStrokeStyle(2, 0xf5cf4a, 0.5);
@@ -113,6 +117,8 @@ export default class TutorialScene extends Phaser.Scene {
   }
 
   finish() {
+    if (this.finished) return;
+    this.finished = true;
     this.registry.set('tutorialSeen', true);
     this.scene.start('Sailing');
   }

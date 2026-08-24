@@ -13,6 +13,11 @@ export default class AccountScene extends Phaser.Scene {
 
   init(data) {
     this.returnSceneKey = data?.returnSceneKey ?? 'Sailing';
+    // Phaser reuses this same Scene instance across every open/close cycle,
+    // so any "already closed" flag from a previous visit MUST be reset here
+    // - otherwise the next close() call sees it still set from last time,
+    // no-ops, and the scene underneath (e.g. Sailing) stays paused forever.
+    this.closed = false;
   }
 
   create() {
@@ -59,6 +64,11 @@ export default class AccountScene extends Phaser.Scene {
 
     const el = this.add.dom(width / 2, height / 2).createFromHTML(html);
     el.getChildByID('ks-close').addEventListener('click', () => this.close());
+    // Keyboard-only escape hatch: without this, a player who opens this
+    // overlay with [C] and never touches the mouse has no way back to the
+    // (paused) game underneath - WASD/Space do nothing while paused, and
+    // the only way out was a tiny text label that must be clicked exactly.
+    this.input.keyboard.once('keydown-ESC', () => this.close());
     if (!configured) return;
 
     const status = (msg) => {
@@ -103,6 +113,12 @@ export default class AccountScene extends Phaser.Scene {
   }
 
   close() {
+    if (this.closed) return;
+    this.closed = true;
+    // an email/password <input> can be mid-edit when this closes; make sure
+    // it doesn't keep browser focus (and swallow the next keystrokes) after
+    // its element is torn down along with the rest of the scene.
+    document.activeElement?.blur();
     this.scene.stop();
     this.scene.resume(this.returnSceneKey);
   }

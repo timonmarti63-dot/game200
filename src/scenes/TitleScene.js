@@ -71,17 +71,29 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     Sfx.unlock();
+    // startGame is independently wired to both a key and a pointer trigger
+    // below; a real click can register as both in quick succession, so this
+    // guard makes sure the scene transition only ever fires once.
+    let started = false;
     const startGame = () => {
+      if (started) return;
+      started = true;
       Sfx.unlock();
       if (this.registry.get('tutorialSeen')) this.scene.start('Sailing');
       else this.scene.start('Tutorial');
     };
     const skipToSailing = () => {
+      if (started) return;
+      started = true;
       Sfx.unlock();
       this.registry.set('tutorialSeen', true);
       this.scene.start('Sailing');
     };
-    const replayTutorial = () => this.scene.start('Tutorial');
+    const replayTutorial = () => {
+      if (started) return;
+      started = true;
+      this.scene.start('Tutorial');
+    };
     this.input.keyboard.once('keydown-SPACE', startGame);
     this.input.once('pointerdown', startGame);
     this.input.keyboard.once('keydown-T', seen ? replayTutorial : skipToSailing);
