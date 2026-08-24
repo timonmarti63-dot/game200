@@ -45,7 +45,10 @@ const LEGEND = {
   T: {
     walkable: true,
     color: 0x8a5fd6,
-    tunnel: { targetSceneKey: 'DemoWorld', targetGridX: 7, targetGridY: 7 },
+    // Lands one tile short of DemoWorld's own tunnel entrance (55,5) - never
+    // exactly on it, or the world scene would immediately re-trigger the
+    // tunnel back to this village on arrival.
+    tunnel: { targetSceneKey: 'DemoWorld', targetGridX: 55, targetGridY: 6 },
   },
 };
 

@@ -54,6 +54,15 @@ export default class GridMovementController {
     this.moveDurationMs = opts.moveDurationMs ?? 160;
     this.isWalkable = opts.isWalkable;
 
+    if (!Number.isFinite(opts.startGridX) || !Number.isFinite(opts.startGridY)) {
+      // A silent NaN here only shows up much later as an unrelated-looking
+      // crash once a tween/camera tries to use it - fail loudly right at
+      // the source instead (this exact mistake - a spawn object shaped
+      // {x,y} instead of {gridX,gridY} - has actually happened once).
+      throw new Error(
+        `GridMovementController: startGridX/startGridY müssen Zahlen sein, bekam (${opts.startGridX}, ${opts.startGridY}).`
+      );
+    }
     this.gridX = opts.startGridX;
     this.gridY = opts.startGridY;
     this.facing = 'down';
