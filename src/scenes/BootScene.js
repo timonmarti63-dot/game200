@@ -78,6 +78,7 @@ const SPRITES = [
   'armor_plate',
   'house_cottage_a',
   'house_cottage_b',
+  'house_farm',
   // Pokemon-style interior furniture
   'furn_bed',
   'furn_table_round',
@@ -99,7 +100,9 @@ export default class BootScene extends Phaser.Scene {
     // Use a relative path so the built site loads sprites correctly whether
     // it's served from the domain root (Vite dev) or a subpath (S3 proxy /
     // GitHub Pages).
-    SPRITES.forEach((key) => this.load.image(key, `sprites/${key}.png`));
+    // Cache-Bust via Version-Query, sonst zeigt Browser alte Haus-Sprites.
+    const CACHE_VER = 'v3';
+    SPRITES.forEach((key) => this.load.image(key, `sprites/${key}.png?${CACHE_VER}`));
   }
 
   create() {

@@ -152,35 +152,9 @@ export default class InteriorScene extends Phaser.Scene {
     // Framed painting hangs above the counter as a wall decoration.
     this.add.image(ROOM_W / 2, 20, 'furn_painting').setDepth(1.1);
 
-    // Furniture along the walls creates a lived-in Pokemon-style room.
-    // Left wall: bookshelf + potted plant.
-    this.add.image(60, 62, 'furn_bookshelf').setOrigin(0.5, 0.5).setDepth(1.5);
-    this.add.image(60, ROOM_H - 100, 'furn_plant_pot').setOrigin(0.5, 0.5).setDepth(ROOM_H - 100 + 0.5);
-    // Right wall: kitchen bench (only in apothecary) or crate stack (smith).
-    if (cfg.shopKind === 'apothecary') {
-      this.add.image(ROOM_W - 80, 58, 'furn_kitchen').setOrigin(0.5, 0.5).setDepth(1.5);
-      this.add.image(ROOM_W - 60, ROOM_H - 110, 'furn_plant_pot').setOrigin(0.5, 0.5).setDepth(ROOM_H - 110 + 0.5);
-    } else {
-      // Smith - stack a few crates + an anvil-suggesting square
-      this.add.image(ROOM_W - 50, 60, 'furn_crate').setDepth(1.5);
-      this.add.image(ROOM_W - 90, 68, 'furn_crate').setDepth(1.6);
-      this.add.image(ROOM_W - 65, ROOM_H - 110, 'furn_crate').setDepth(ROOM_H - 110 + 0.5);
-    }
-    // A round table with an item sits in a front corner for warmth.
-    this.add.image(80, ROOM_H - 70, 'furn_table_round').setOrigin(0.5, 0.5).setDepth(ROOM_H - 70 + 0.5);
-    // An armchair opposite the table.
-    this.add.image(ROOM_W - 90, ROOM_H - 68, 'furn_armchair').setOrigin(0.5, 0.5).setDepth(ROOM_H - 68 + 0.5);
-
-    // A trio of decorative shelves along the back wall (potions or weapons).
-    const shelfTexture = cfg.shopKind === 'apothecary' ? 'potion' : 'sword';
-    const shelfAlt = cfg.shopKind === 'apothecary' ? 'potion_medium' : 'warhammer';
-    for (let i = 0; i < 3; i++) {
-      const sx = 130 + i * 75;
-      const sy = 40;
-      this.add.rectangle(sx, sy, 60, 5, 0x3a2818, 1).setDepth(2);
-      this.add.image(sx - 14, sy - 11, shelfTexture).setDepth(3);
-      this.add.image(sx + 14, sy - 13, shelfAlt).setDepth(3);
-    }
+    // Furniture-Layout je nach Innenraum-Typ - jedes Höchstwahrscheinlich
+    // fühlt sich anders an (Pokemon-Prinzip: kompakte belohnende Räume).
+    this.layoutFurniture(cfg);
 
     // Counter running horizontally at 60% height.
     const counterY = ROOM_H * 0.55;
@@ -315,6 +289,130 @@ export default class InteriorScene extends Phaser.Scene {
 
     // Greeting is already rendered as a fixed label above the counter -
     // no need to also toast it, which used to double-print.
+  }
+
+  // Bestimmt Wand-Deko, Regale und Möbel je nach Interior-Typ.
+  // Alle Räume nutzen dieselbe Grundstruktur (Boden+Wände), aber Inhalt
+  // variiert stark - Pokemon-Feeling: jedes Haus fühlt sich einzigartig an.
+  layoutFurniture(cfg) {
+    const kind = this.interiorKind;
+
+    // Gemeinsame Deko: Pflanze links vorne bringt Wohnlichkeit.
+    this.add.image(60, ROOM_H - 100, 'furn_plant_pot')
+      .setOrigin(0.5, 0.5).setDepth(ROOM_H - 100 + 0.5);
+
+    if (kind === 'apothecary') {
+      // Apotheke: Bücher, Küche, Trank-Regale
+      this.add.image(60, 62, 'furn_bookshelf').setDepth(1.5);
+      this.add.image(ROOM_W - 80, 58, 'furn_kitchen').setDepth(1.5);
+      this.add.image(ROOM_W - 60, ROOM_H - 110, 'furn_plant_pot')
+        .setDepth(ROOM_H - 110 + 0.5);
+      this.add.image(80, ROOM_H - 70, 'furn_table_round')
+        .setDepth(ROOM_H - 70 + 0.5);
+      this.add.image(ROOM_W - 90, ROOM_H - 68, 'furn_armchair')
+        .setDepth(ROOM_H - 68 + 0.5);
+      this.paintShelves('potion', 'potion_medium');
+
+    } else if (kind === 'smith') {
+      // Schmiede: Kisten, Waffen, dunkle Metalloptik
+      this.add.image(60, 62, 'furn_bookshelf').setDepth(1.5);
+      this.add.image(ROOM_W - 50, 60, 'furn_crate').setDepth(1.5);
+      this.add.image(ROOM_W - 90, 68, 'furn_crate').setDepth(1.6);
+      this.add.image(ROOM_W - 65, ROOM_H - 110, 'furn_crate')
+        .setDepth(ROOM_H - 110 + 0.5);
+      this.add.image(80, ROOM_H - 70, 'furn_table_round')
+        .setDepth(ROOM_H - 70 + 0.5);
+      this.add.image(ROOM_W - 90, ROOM_H - 68, 'furn_armchair')
+        .setDepth(ROOM_H - 68 + 0.5);
+      this.paintShelves('sword', 'warhammer');
+
+    } else if (kind === 'cottage') {
+      // Häuschen: Kamin, Bett, Bücher, gemütlich
+      // Kamin an linker Wand
+      this.add.rectangle(70, 60, 50, 44, 0x4a2a10)
+        .setStrokeStyle(2, 0x1a0f08).setDepth(1.5);
+      this.add.rectangle(70, 62, 30, 26, 0x2a1a08).setDepth(1.6);
+      // Feuer-Effekt im Kamin
+      this.add.rectangle(70, 68, 20, 12, 0xff8a2a, 0.9).setDepth(1.7);
+      this.add.rectangle(70, 68, 12, 8, 0xffcf6a, 0.9).setDepth(1.71);
+      this.tweens.add({
+        targets: this.add.circle(70, 62, 4, 0xffcf6a, 0.6).setDepth(1.72),
+        scale: { from: 0.8, to: 1.3 }, alpha: { from: 0.5, to: 0.8 },
+        duration: 500, yoyo: true, repeat: -1,
+      });
+      // Bett rechts hinten
+      this.add.image(ROOM_W - 70, 65, 'furn_bookshelf').setDepth(1.5);
+      // Runder Tisch vorne
+      this.add.image(80, ROOM_H - 70, 'furn_table_round')
+        .setDepth(ROOM_H - 70 + 0.5);
+      this.add.image(ROOM_W - 90, ROOM_H - 68, 'furn_armchair')
+        .setDepth(ROOM_H - 68 + 0.5);
+      // Regale mit Kräutern/Blumen
+      this.paintShelves('flowers', 'potion');
+
+    } else if (kind === 'farm') {
+      // Bauernhof: Strohsack, Rübenkisten, Hupf-Hühner
+      // Strohballen als "Bett"
+      this.add.rectangle(70, 65, 44, 30, 0xd4a45a)
+        .setStrokeStyle(2, 0x8a6a2a).setDepth(1.5);
+      this.add.rectangle(70, 65, 44, 4, 0xf5cf6a).setDepth(1.51);
+      this.add.rectangle(70, 71, 44, 4, 0xa88a3a).setDepth(1.52);
+      // Rüben-Kisten rechts hinten
+      this.add.image(ROOM_W - 50, 60, 'furn_crate').setDepth(1.5);
+      this.add.image(ROOM_W - 90, 68, 'furn_crate').setDepth(1.6);
+      // Rüben oben drauf
+      this.add.image(ROOM_W - 50, 50, 'veggie').setDepth(1.7);
+      this.add.image(ROOM_W - 90, 58, 'veggie').setDepth(1.71);
+      // Runder Tisch
+      this.add.image(80, ROOM_H - 70, 'furn_table_round')
+        .setDepth(ROOM_H - 70 + 0.5);
+      this.add.image(80, ROOM_H - 74, 'veggie').setDepth(ROOM_H - 70 + 0.6);
+      // Zweites Huhn im Raum
+      const chick2 = this.add.image(ROOM_W - 90, ROOM_H - 90, 'chicken')
+        .setDepth(ROOM_H - 90 + 0.5);
+      this.tweens.add({
+        targets: chick2, y: ROOM_H - 94, duration: 500, yoyo: true, repeat: -1,
+      });
+      // Regale mit Rüben
+      this.paintShelves('veggie', 'veggie');
+
+    } else if (kind === 'tavern') {
+      // Wirtshaus: Fässer, mehrere Tische, dunklere Atmosphäre
+      // Fässer hinten links
+      this.add.image(50, 62, 'furn_crate').setDepth(1.5);
+      this.add.image(80, 60, 'furn_crate').setDepth(1.51);
+      // Bar-Regal mit Krügen
+      this.paintShelves('potion_medium', 'potion');
+      // Tisch mit Stuhl vorne links
+      this.add.image(90, ROOM_H - 75, 'furn_table_round')
+        .setDepth(ROOM_H - 75 + 0.5);
+      this.add.image(90, ROOM_H - 80, 'potion_medium')
+        .setDepth(ROOM_H - 75 + 0.6);
+      // Sessel vorne rechts
+      this.add.image(ROOM_W - 80, ROOM_H - 68, 'furn_armchair')
+        .setDepth(ROOM_H - 68 + 0.5);
+      // Weitere Fässer rechts hinten
+      this.add.image(ROOM_W - 55, 65, 'furn_crate').setDepth(1.5);
+      // Kerze/Fackel-Effekt an der Wand
+      this.add.circle(ROOM_W / 2, 30, 5, 0xff8a2a, 0.7).setDepth(1.9);
+
+    } else {
+      // Fallback
+      this.add.image(60, 62, 'furn_bookshelf').setDepth(1.5);
+      this.add.image(80, ROOM_H - 70, 'furn_table_round')
+        .setDepth(ROOM_H - 70 + 0.5);
+    }
+  }
+
+  // Drei kleine Regale an der Hinterwand mit zwei Items pro Brett.
+  paintShelves(itemA, itemB) {
+    for (let i = 0; i < 3; i++) {
+      const sx = 130 + i * 75;
+      const sy = 40;
+      this.add.rectangle(sx, sy, 60, 5, 0x3a2818, 1).setDepth(2);
+      this.add.image(sx - 14, sy - 11, itemA).setDepth(3);
+      this.add.image(sx + 14, sy - 13, itemB).setDepth(3);
+    }
   }
 
   showRumor() {

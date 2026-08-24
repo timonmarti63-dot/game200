@@ -457,15 +457,20 @@ export default class IslandScene extends Phaser.Scene {
     // Pokemon-Regel: kein Haus ohne Zweck. Cottages/Bauernhof/Wirtshaus
     // haben interiorKind + label - beim Betreten öffnet ein Talker-Room
     // mit Gerüchten über Kaiser, Nachbarinseln und versteckte Schätze.
+    // Die neuen Haus-Sprites sind bereits in Zielgrösse (96/128/160 px
+    // breit) mit Tür exakt mittig unten. scale=1.0 - keine Skalierung.
+    // Sprites in Zielgrösse 160-224px Breite mit Tür exakt mittig unten.
+    // scale=1.0 - Sprites werden 1:1 gezeichnet, Tür sitzt genau auf Türkachel.
+    // Sprites 160-224px breit; scale 1.5-1.8 damit Tür gut sichtbar ist.
     const houses = [
-      { key: 'house_apothecary', col: 8,  row: 10, footCols: 4, footRows: 3, scale: 3.0, shop: 'apothecary', label: 'Apotheke' },
-      { key: 'house_smith',      col: 17, row: 10, footCols: 4, footRows: 3, scale: 3.0, shop: 'smith',      label: 'Schmiede' },
-      { key: 'house_cottage_a',  col: 5,  row: 20, footCols: 3, footRows: 3, scale: 2.6, interiorKind: 'cottage', label: 'Häuschen' },
-      { key: 'house_cottage_b',  col: 11, row: 24, footCols: 3, footRows: 3, scale: 2.6, interiorKind: 'farm',    label: 'Bauernhof' },
-      { key: 'house_cottage_a',  col: 17, row: 20, footCols: 3, footRows: 3, scale: 2.6 },
-      { key: 'house_cottage_b',  col: 20, row: 24, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_apothecary', col: 8,  row: 10, footCols: 6, footRows: 8, scale: 1.5, shop: 'apothecary', label: 'Apotheke' },
+      { key: 'house_smith',      col: 17, row: 10, footCols: 6, footRows: 8, scale: 1.5, shop: 'smith',      label: 'Schmiede' },
+      { key: 'house_cottage_a',  col: 5,  row: 20, footCols: 5, footRows: 6, scale: 1.5, interiorKind: 'cottage', label: 'Häuschen' },
+      { key: 'house_farm',       col: 11, row: 24, footCols: 5, footRows: 6, scale: 1.5, interiorKind: 'farm',    label: 'Bauernhof' },
+      { key: 'house_cottage_a',  col: 17, row: 20, footCols: 5, footRows: 6, scale: 1.5 },
+      { key: 'house_cottage_b',  col: 20, row: 24, footCols: 5, footRows: 6, scale: 1.5 },
       { key: 'house_stone',      col: 4,  row: 30, footCols: 3, footRows: 3, scale: 2.6 },
-      { key: 'house_inn',        col: 18, row: 32, footCols: 4, footRows: 3, scale: 3.0, interiorKind: 'tavern', label: 'Wirtshaus' },
+      { key: 'house_inn',        col: 18, row: 32, footCols: 8, footRows: 10, scale: 1.5, interiorKind: 'tavern', label: 'Wirtshaus' },
     ];
 
     // Curved paths connecting well to key destinations.
@@ -506,29 +511,28 @@ export default class IslandScene extends Phaser.Scene {
         }
       }
 
-      // Sprite so platzieren, dass die Tür genau auf die Türkachel fällt.
-      // Origin (0.5, 1) ankert Sprite an seiner Unterkante Mitte, was
-      // für unsere Häuser-Sprites (Tür am unteren Rand) genau passt.
-      const img = this.add.image(doorWorld.x, doorWorld.y + T / 2, key)
+      // Sprite mit Origin (0.5, 1) am Sprite-Fuss ankern. Sprite-Fuss
+      // sitzt auf der Unterkante der Türkachel, sodass das Sprite genau
+      // die Türkachel-Zeile abdeckt und die Tür visuell direkt über der
+      // Standkachel gemalt wird.
+      const spriteBottomY = doorWorld.y + T / 2;
+      const img = this.add.image(doorWorld.x, spriteBottomY, key)
         .setOrigin(0.5, 1)
         .setScale(scale);
-      img.setDepth(doorWorld.y + T / 2 - 1);
+      img.setDepth(spriteBottomY - 1);
       this.houses.push(img);
 
       // Talker- oder Shop-Häuser bekommen Türportal + Warp.
       const hasInterior = !!shop || !!interiorKind;
       if (hasInterior) {
-        // Schwarzes Türrechteck IN die gemalte Tür des Haus-Sprites setzen.
-        // Bei den grossen Häuser-Sprites (scale ~2.6) sitzt die Tür ca.
-        // 10-14% über der Sprite-Unterkante, nicht ganz unten. Wir nehmen
-        // den Sprite (bereits erzeugt) und legen das Portal in dessen
-        // untere Tür-Zone: portalY liegt ~T*0.9 unter der Sprite-Mitte.
-        const spriteBottomY = doorWorld.y + T / 2; // Sprite-Origin (0.5,1)
-        const portalX = doorWorld.x;
-        const portalY = spriteBottomY - T * 0.55;
-        const portalW = T * 0.7;
-        const portalH = T * 0.85;
-        this.paintDoorwayPortalOnHouse(portalX, portalY, portalW, portalH, spriteBottomY);
+        // Die neuen Haus-Sprites haben eine klar sichtbare Tür mittig am
+        // unteren Rand des Sprites - genau dort wo die Türkachel liegt.
+        // Kein extra Türportal mehr nötig. Wir malen nur einen dezenten
+        // warmen Feuerschein VOR der Tür als "Enter here"-Hinweis.
+        const spriteFootY = doorWorld.y + T / 2;
+        this.add
+          .circle(doorWorld.x, spriteFootY - 4, 5, 0xf5cf4a, 0.35)
+          .setDepth(spriteFootY - 0.5);
         // Warp-Event auf Türkachel registrieren: shop öffnet ShopScene,
         // interior öffnet Talker-Innenraum (kein Kaufen).
         const warpPayload = shop
@@ -568,19 +572,56 @@ export default class IslandScene extends Phaser.Scene {
     const d = anchorY + 0.1;
     const cx = x;
 
-    // 1) Warm firelight hint inside the sprite's painted doorway. Small,
-    //    low-opacity so it looks like a lit torch behind the door.
+    // Pokemon-Stil Tür: dunkler Rahmen + Holztür + Klinke + Steinschwelle.
+    // Wird SICHTBAR auf dem Haus-Sprite platziert damit klar ist wo
+    // der Eingang ist. Kompakt (24x30) und sitzt in der unteren Fassade.
+
+    // Türrahmen (Stein/dunkles Holz)
     this.add
-      .rectangle(cx, y - height * 0.25, Math.max(6, width - 10), Math.max(6, height * 0.5), 0x8a3a12, 0.28)
+      .rectangle(cx, y, width + 4, height + 3, 0x2a1a0e)
       .setDepth(d + 0.02);
 
-    // 2) Two glowing lantern-dots flanking the door top - "enter here".
+    // Türblatt (warmes Holz mit vertikaler Maserung)
     this.add
-      .circle(cx - width / 2 + 1, y - height + 2, 1.4, 0xf5cf4a, 0.95)
+      .rectangle(cx, y, width, height, 0x6b3a1a)
+      .setDepth(d + 0.03);
+    // Vertikale Bretter-Linien
+    this.add
+      .rectangle(cx - width * 0.22, y, 1, height - 4, 0x3a1f0c)
       .setDepth(d + 0.04);
     this.add
-      .circle(cx + width / 2 - 1, y - height + 2, 1.4, 0xf5cf4a, 0.95)
+      .rectangle(cx + width * 0.22, y, 1, height - 4, 0x3a1f0c)
       .setDepth(d + 0.04);
+
+    // Bogen oben (dunkler Halbkreis-Effekt via 2 Ecken-Trianglen)
+    const archH = Math.max(3, Math.floor(width * 0.28));
+    const archColor = 0x2a1a0e;
+    this.add.triangle(
+      cx - width / 2 + 1, y - height / 2 + archH / 2 - 1,
+      0, 0, archH, 0, 0, archH,
+      archColor,
+    ).setDepth(d + 0.05);
+    this.add.triangle(
+      cx + width / 2 - 1, y - height / 2 + archH / 2 - 1,
+      0, 0, -archH, 0, 0, archH,
+      archColor,
+    ).setDepth(d + 0.05);
+
+    // Warmes Innenlicht (kleines Fenster oben in der Tür)
+    this.add
+      .rectangle(cx, y - height * 0.28, Math.max(4, width - 12), 3, 0xf5cf4a, 0.85)
+      .setDepth(d + 0.06);
+
+    // Messing-Türklinke rechts
+    this.add
+      .circle(cx + width / 2 - 3, y + 2, 1.4, 0xd4a45a)
+      .setDepth(d + 0.07);
+
+    // Steinschwelle unten (etwas breiter als Tür)
+    this.add
+      .rectangle(cx, y + height / 2 + 2, width + 6, 3, 0x8a7350)
+      .setStrokeStyle(1, 0x3a2a18)
+      .setDepth(d + 0.08);
   }
 
   // Central warp dispatcher. Zones set their kind + payload; this decides
