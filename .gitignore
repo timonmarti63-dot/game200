@@ -2,3 +2,6 @@ node_modules
 dist
 *.log
 tools/_preview
+public/sprites_new/
+public/sprites_backup_v3/
+sprites_contact_sheet.png
