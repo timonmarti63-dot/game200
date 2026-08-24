@@ -461,16 +461,17 @@ export default class IslandScene extends Phaser.Scene {
     // breit) mit Tür exakt mittig unten. scale=1.0 - keine Skalierung.
     // Sprites in Zielgrösse 160-224px Breite mit Tür exakt mittig unten.
     // scale=1.0 - Sprites werden 1:1 gezeichnet, Tür sitzt genau auf Türkachel.
-    // Sprites 160-224px breit; scale 1.5-1.8 damit Tür gut sichtbar ist.
+    // Sprites 160-224px breit; moderat skaliert und weit auseinander,
+    // damit sich Häuser nicht überlappen und Wege dazwischen sichtbar
+    // bleiben. Reihen: Shops oben (r=6), Wohnhäuser Mitte (r=18/22),
+    // Wirtshaus unten (r=32) - mit genügend Abstand.
     const houses = [
-      { key: 'house_apothecary', col: 8,  row: 10, footCols: 6, footRows: 8, scale: 1.5, shop: 'apothecary', label: 'Apotheke' },
-      { key: 'house_smith',      col: 17, row: 10, footCols: 6, footRows: 8, scale: 1.5, shop: 'smith',      label: 'Schmiede' },
-      { key: 'house_cottage_a',  col: 5,  row: 20, footCols: 5, footRows: 6, scale: 1.5, interiorKind: 'cottage', label: 'Häuschen' },
-      { key: 'house_farm',       col: 11, row: 24, footCols: 5, footRows: 6, scale: 1.5, interiorKind: 'farm',    label: 'Bauernhof' },
-      { key: 'house_cottage_a',  col: 17, row: 20, footCols: 5, footRows: 6, scale: 1.5 },
-      { key: 'house_cottage_b',  col: 20, row: 24, footCols: 5, footRows: 6, scale: 1.5 },
-      { key: 'house_stone',      col: 4,  row: 30, footCols: 3, footRows: 3, scale: 2.6 },
-      { key: 'house_inn',        col: 18, row: 32, footCols: 8, footRows: 10, scale: 1.5, interiorKind: 'tavern', label: 'Wirtshaus' },
+      { key: 'house_apothecary', col: 6,  row: 6,  footCols: 4, footRows: 5, scale: 1.0, shop: 'apothecary', label: 'Apotheke' },
+      { key: 'house_smith',      col: 20, row: 6,  footCols: 4, footRows: 5, scale: 1.0, shop: 'smith',      label: 'Schmiede' },
+      { key: 'house_cottage_a',  col: 5,  row: 18, footCols: 4, footRows: 5, scale: 1.0, interiorKind: 'cottage', label: 'Häuschen' },
+      { key: 'house_farm',       col: 13, row: 20, footCols: 4, footRows: 5, scale: 1.0, interiorKind: 'farm',    label: 'Bauernhof' },
+      { key: 'house_cottage_b',  col: 22, row: 18, footCols: 4, footRows: 5, scale: 1.0 },
+      { key: 'house_inn',        col: 14, row: 32, footCols: 5, footRows: 7, scale: 1.0, interiorKind: 'tavern', label: 'Wirtshaus' },
     ];
 
     // Curved paths connecting well to key destinations.
