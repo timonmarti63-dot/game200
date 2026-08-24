@@ -2,8 +2,12 @@
 // re-runs create() (new island, or re-landing on one already conquered),
 // silently wiping weapon/armor/hotbar/backpack/HP/abilities. This persists
 // that state across scenes for the lifetime of the browser tab via the
-// Phaser registry (shared game-wide, reset on full page reload - there is
-// no server/localStorage save here, only same-session continuity).
+// Phaser registry (shared game-wide, reset on full page reload). If the
+// player is logged in to the optional cloud save (see CloudSave.js), every
+// local save also gets debounced up to Supabase for cross-device sync -
+// a no-op when cloud save isn't configured/logged in.
+import { scheduleCloudSave } from './CloudSave.js';
+
 const KEY = 'playerState';
 
 export function savePlayerState(player) {
@@ -18,6 +22,7 @@ export function savePlayerState(player) {
     backpack: inv.backpack.map((e) => ({ ...e })),
     hasGrapple: player.hasGrapple,
   });
+  scheduleCloudSave(player.scene.registry);
 }
 
 export function loadPlayerState(scene) {

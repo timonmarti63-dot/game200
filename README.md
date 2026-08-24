@@ -34,6 +34,21 @@ Dann im Browser die angezeigte URL öffnen (Standard: http://localhost:5173).
 | Hotbar-Slot benutzen | 1 / 2 / 3 / 4 |
 | Inventar öffnen/schließen | E (oder Esc im Inventar) |
 
+## Cloud-Speicher (optional, kostenlos, geräteübergreifend)
+
+Standardmäßig läuft das Spiel komplett ohne Backend — Fortschritt bleibt nur für die aktuelle Browser-Sitzung erhalten. Optional lässt sich ein kostenloser [Supabase](https://supabase.com)-Account anbinden, damit Ausrüstung/Hotbar/Rucksack/eroberte Inseln mit einem Login geräteübergreifend gespeichert werden — ganz ohne eigenen Server-Code, da das Spiel direkt (über die öffentliche "anon"-Taste + Row-Level-Security) mit Supabase spricht.
+
+**Einrichtung (ca. 3 Minuten):**
+1. Kostenloses Projekt auf [supabase.com](https://supabase.com) anlegen.
+2. Im Supabase-Dashboard unter *SQL Editor* den Inhalt von `supabase/schema.sql` einfügen und ausführen (legt die Tabelle + Zugriffsrechte an).
+3. Unter *Settings → API* die **Project URL** und den **anon public key** kopieren.
+4. Beides in `src/systems/CloudSave.js` eintragen (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+5. Neu bauen/deployen (`npm run build`, bzw. bei Vercel reicht ein Push).
+
+Im Spiel dann über **[C]** auf dem Titelbildschirm oder auf See ein Konto registrieren/anmelden. Ohne Einrichtung zeigt der Cloud-Speicher-Dialog einfach "nicht eingerichtet" und das Spiel funktioniert wie zuvor lokal weiter.
+
+**Wichtig:** Der Cloud-Login funktioniert nur auf einer echten Deployment-URL (z. B. Vercel) — die Vorschau in einem geteilten Claude-Artifact blockiert aus Sicherheitsgründen Netzwerkzugriffe zu fremden Servern und zeigt daher immer "nicht eingerichtet", selbst mit echten Zugangsdaten im Code.
+
 ## Projektstruktur
 
 - `src/scenes/` – Boot, Title, Tutorial, Sailing, Island (jetzt konfigurationsgetrieben für mehrere Inseln), UI, Inventory
@@ -42,6 +57,7 @@ Dann im Browser die angezeigte URL öffnen (Standard: http://localhost:5173).
 - `src/systems/Inventory.js` – Inventar-Logik (Hotbar, Rucksack, Waffen-/Rüstungs-Slot, Item-Stapel)
 - `src/systems/Insults.js` – Beleidigungs- und Kampfansage-Texte
 - `src/systems/Sfx.js` – prozeduraler Web-Audio-Soundeffekt-Synthesizer
+- `src/systems/PlayerState.js` / `src/systems/CloudSave.js` – lokale Sitzungs-Persistenz bzw. optionale Supabase-Cloud-Speicherung
 - `src/assets.js` – prozeduraler Generator für kleine UI-Icons (Herzen, Ausrufezeichen, Nebel-VFX)
 - `public/sprites/` – handgezeichnete Pixel-Art-PNGs (Spieler, Gegner, Bosse, Items, Häuser, Deko, Boot, Tiles), von BootScene geladen
 - `tools/generate_pixel_art.py` – Python/Pillow-Skript, das `public/sprites/` erzeugt; `python3 tools/generate_pixel_art.py` zum Neu-Generieren/Anpassen (legt zusätzlich ein Kontaktabzug-Preview unter `tools/_preview/` an)

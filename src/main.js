@@ -6,6 +6,7 @@ import SailingScene from './scenes/SailingScene.js';
 import IslandScene from './scenes/IslandScene.js';
 import UIScene from './scenes/UIScene.js';
 import InventoryScene from './scenes/InventoryScene.js';
+import AccountScene from './scenes/AccountScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -15,6 +16,9 @@ const config = {
   pixelArt: true,
   roundPixels: true,
   backgroundColor: '#1b1f2a',
+  dom: {
+    createContainer: true, // needed for AccountScene's HTML login form
+  },
   physics: {
     default: 'arcade',
     arcade: {
@@ -28,7 +32,7 @@ const config = {
     width: 480,
     height: 320,
   },
-  scene: [BootScene, TitleScene, TutorialScene, SailingScene, IslandScene, UIScene, InventoryScene],
+  scene: [BootScene, TitleScene, TutorialScene, SailingScene, IslandScene, UIScene, InventoryScene, AccountScene],
 };
 
 window.game = new Phaser.Game(config);

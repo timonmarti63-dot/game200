@@ -83,6 +83,15 @@ export default class SailingScene extends Phaser.Scene {
         color: '#cfe0ff',
       })
       .setScrollFactor(0);
+
+    this.add
+      .text(this.scale.width - 8, 8, '[C] ☁ Cloud-Speicher', { fontFamily: 'Courier New', fontSize: '9px', color: '#7f9cc9' })
+      .setOrigin(1, 0)
+      .setScrollFactor(0);
+    this.input.keyboard.on('keydown-C', () => {
+      this.scene.pause();
+      this.scene.launch('Account', { returnSceneKey: 'Sailing' });
+    });
   }
 
   update(time, delta) {

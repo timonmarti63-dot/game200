@@ -62,6 +62,14 @@ export default class TitleScene extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
+    this.add
+      .text(width - 8, 8, '[C] ☁ Cloud-Speicher', { fontFamily: 'Courier New', fontSize: '9px', color: '#7f9cc9' })
+      .setOrigin(1, 0);
+    this.input.keyboard.on('keydown-C', () => {
+      this.scene.pause();
+      this.scene.launch('Account', { returnSceneKey: 'Title' });
+    });
+
     Sfx.unlock();
     const startGame = () => {
       Sfx.unlock();

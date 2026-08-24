@@ -10,6 +10,7 @@ import DukeGrendal from '../entities/DukeGrendal.js';
 import { spawnPickup, spawnChest, spawnProjectile, resolveProjectileHitEnemy, landProjectile } from '../entities/Pickup.js';
 import { ITEMS } from '../systems/Items.js';
 import { Sfx } from '../systems/Sfx.js';
+import { scheduleCloudSave } from '../systems/CloudSave.js';
 
 const T = 32;
 
@@ -608,6 +609,7 @@ export default class IslandScene extends Phaser.Scene {
 
   onBossDied() {
     this.registry.set(`conquered_${this.islandKey}`, true);
+    scheduleCloudSave(this.registry);
     this.events.emit('toast', this.cfg.victoryText);
     Sfx.bossDefeat();
     const potion = spawnPickup(this, 'potion', this.boss.x, this.boss.y);
