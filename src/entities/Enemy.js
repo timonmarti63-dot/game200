@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Sfx } from '../systems/Sfx.js';
+import { getDifficulty } from '../systems/Difficulty.js';
 
 export default class Enemy extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, texture, opts = {}) {
@@ -8,11 +9,22 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
     this.setCollideWorldBounds(true);
 
-    this.maxHp = opts.hp ?? 3;
+    // Difficulty scales enemy HP and contact damage in one place so
+    // subclasses don't need to think about it. Bosses can opt out via
+    // opts.isBoss - they scale HP more gently to stay fair.
+    const diff = getDifficulty(scene.registry);
+    const hpMul = opts.isBoss ? Math.max(1, (diff.enemyHpMult + 1) / 2) : diff.enemyHpMult;
+    const dmgMul = diff.enemyDamageMult;
+
+    this.maxHp = Math.max(1, Math.round((opts.hp ?? 3) * hpMul));
     this.hp = this.maxHp;
     this.speed = opts.speed ?? 40;
-    this.contactDamage = opts.contactDamage ?? 1;
+    this.contactDamage = Math.max(1, Math.round((opts.contactDamage ?? 1) * dmgMul));
     this.xpValue = opts.xpValue ?? 1;
+    // Loot props for currency drops. Bosses set goldDrop; regular enemies
+    // drop 1-5 silver, scaled by difficulty's silverMult.
+    this.silverDrop = opts.silverDrop ?? (opts.isBoss ? 0 : Phaser.Math.Between(1, 5));
+    this.goldDrop = opts.goldDrop ?? (opts.isBoss ? 1 : 0);
     this.state = 'idle';
     this.dead = false;
     this.stateUntil = 0;

@@ -27,6 +27,13 @@ export default class SailingScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, worldW, worldH);
     this.cameras.main.startFollow(this.boat, true, 0.08, 0.08);
 
+    // Island bodies are static circles so the boat cannot sail through
+    // land. Each island also gets a dock sprite at its south edge and a
+    // "harbor zone" that the boat has to actually touch (not just get
+    // near the island's centre) before landing is allowed. That's why
+    // players used to be able to sail "under" the island - there was no
+    // collision and the near-check just used the island's centre.
+    this.landColliders = this.physics.add.staticGroup();
     this.markers = [];
     ISLANDS.forEach((info) => {
       const conquered = this.registry.get(`conquered_${info.key}`);
@@ -35,7 +42,25 @@ export default class SailingScene extends Phaser.Scene {
         land.setTint(0x6b7078);
         this.add.image(info.x, info.y, 'lock_icon').setScale(1.3).setDepth(1);
       }
-      const labelY = info.y + (land.displayHeight / 2) + 10;
+      // Collision: a static rectangle roughly the size of the island
+      // sprite so the boat physically bumps into it. Using a rect body
+      // (not a circle) keeps the physics predictable across Phaser
+      // versions.
+      const halfW = Math.max(38, Math.round(land.displayWidth * 0.32));
+      const halfH = Math.max(38, Math.round(land.displayHeight * 0.30));
+      const bodyRect = this.add.rectangle(info.x, info.y - 6, halfW * 2, halfH * 2, 0, 0);
+      this.physics.add.existing(bodyRect, true);
+      this.landColliders.add(bodyRect);
+
+      // Dock jutting south from the island. Landing is only allowed when
+      // the boat overlaps this dock zone.
+      const dockX = info.x;
+      const dockY = info.y + Math.round(land.displayHeight / 2) - 4;
+      const dockImg = this.add.image(dockX, dockY, 'dock').setDepth(0);
+      const dockZone = this.add.zone(dockX, dockY, 60, 28);
+      this.physics.add.existing(dockZone, true);
+
+      const labelY = dockY + 22;
       const label = this.add
         .text(info.x, labelY, conquered ? `${info.name} (erobert)` : info.name, {
           fontFamily: 'Georgia, serif',
@@ -45,8 +70,10 @@ export default class SailingScene extends Phaser.Scene {
           strokeThickness: 3,
         })
         .setOrigin(0.5);
-      this.markers.push({ info, land, label });
+      this.markers.push({ info, land, label, dockImg, dockZone });
     });
+
+    this.physics.add.collider(this.boat, this.landColliders);
 
     this.prompt = this.add
       .text(this.scale.width / 2, this.scale.height - 30, '', {
@@ -102,10 +129,12 @@ export default class SailingScene extends Phaser.Scene {
     // the boat sprite always points north, regardless of travel direction
     this.boat.setRotation(0);
 
+    // Landing only when the boat overlaps the dock zone. This replaces
+    // the older "within 100px of centre" check that let players park
+    // "underneath" the island through empty water.
     this.nearIsland = null;
     for (const m of this.markers) {
-      const d = Phaser.Math.Distance.Between(this.boat.x, this.boat.y, m.info.x, m.info.y);
-      if (d < 100) {
+      if (this.physics.overlap(this.boat, m.dockZone)) {
         this.nearIsland = m;
         break;
       }

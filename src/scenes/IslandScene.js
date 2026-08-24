@@ -10,6 +10,8 @@ import DukeGrendal from '../entities/DukeGrendal.js';
 import { spawnPickup, spawnChest, spawnProjectile, resolveProjectileHitEnemy, landProjectile } from '../entities/Pickup.js';
 import { ITEMS } from '../systems/Items.js';
 import { Sfx } from '../systems/Sfx.js';
+import { addSilver, addGold, ensureInitialised as ensureCurrency, getSilver } from '../systems/Currency.js';
+import { getDifficulty } from '../systems/Difficulty.js';
 
 const T = 32;
 
@@ -19,31 +21,51 @@ const T = 32;
 // into absolute world coordinates, shifted right to make room for a village.
 const OFFSET = 96;
 const BEACH_MARGIN = 32;
-const VILLAGE_W = 10 * T;
-const FIELD_W = 36 * T;
-const FIELD_H = 27 * T;
+// Bigger island: village is now a real 20-tile-wide strip and the field
+// grows to 48x36 so exploration takes real time. This also makes room
+// for the arena-on-hill terrace at the top-right corner.
+const VILLAGE_W = 20 * T;
+const FIELD_W = 48 * T;
+const FIELD_H = 36 * T;
 const GRASS_W = VILLAGE_W + FIELD_W;
 const GRASS_H = FIELD_H;
 const OUTDOOR_W = GRASS_W + OFFSET * 2;
 const OUTDOOR_H = GRASS_H + OFFSET * 2;
+// Harbor: the boat parks at the bottom-centre of the island. The dock
+// juts out one tile-height into the sand ring so the player can walk
+// off the boat directly onto solid ground.
+const HARBOR_X = OFFSET + GRASS_W / 2;
+const HARBOR_Y = OFFSET + GRASS_H - T; // stays inside the grass bounds
 
 const FX = (x) => OFFSET + VILLAGE_W + x;
 const FY = (y) => OFFSET + y;
 const VX = (x) => OFFSET + x; // village-strip local -> absolute (shares the y axis with FY)
 
-const CASTLE_LOCAL_COL = 11;
+// The castle now sits at the far NORTH of the field, on the elevated
+// terrace ("arena hill"). Its bottom row is the gatehouse that faces
+// south so the player approaches it up the path.
+const CASTLE_LOCAL_COL = 16;
 const CASTLE_LOCAL_ROW = 3;
 const CASTLE_ORIGIN_X = FX(CASTLE_LOCAL_COL * T);
 const CASTLE_ORIGIN_Y = FY(CASTLE_LOCAL_ROW * T);
-const CASTLE_COLS = 8;
-const CASTLE_ROWS = 5;
-const GATE_GAP = new Set(['3,4', '4,4']);
-const GATE_GAP_COLS = [3, 4];
-const GATE_ZONE = { x: CASTLE_ORIGIN_X + 3.5 * T, y: CASTLE_ORIGIN_Y + 4 * T };
+const CASTLE_COLS = 10;
+const CASTLE_ROWS = 6;
+const GATE_GAP = new Set(['4,5', '5,5']);
+const GATE_GAP_COLS = [4, 5];
+const GATE_ZONE = { x: CASTLE_ORIGIN_X + 4.5 * T, y: CASTLE_ORIGIN_Y + 5 * T };
 
-const PATH_COL_A = 14;
-const PATH_COL_B = 15;
-const PLAYER_START = { x: FX(PATH_COL_A * T + 32), y: FY(FIELD_H - 32) };
+// The path spine runs from the harbor at the bottom, past the village,
+// through the field, and up the elevation ramp to the gate.
+const PATH_COL_A = 22;
+const PATH_COL_B = 23;
+// The player now spawns on the dock instead of a random path tile, so
+// they visibly "disembark" from the boat.
+const PLAYER_START = { x: HARBOR_X, y: HARBOR_Y - 8 };
+
+// Elevation terrace: a raised plateau at the north of the field that
+// hosts the arena and connects to the field via a single central ramp.
+const ELEVATION_ROW = 8; // bottom edge of the terrace in field-local rows
+const ELEVATION_RAMP_COLS = [PATH_COL_A - 16, PATH_COL_B - 16]; // ramp gap
 
 const ARENA_X = OUTDOOR_W + 120;
 const ARENA_Y = 0;
@@ -106,7 +128,7 @@ const ISLAND_CONFIGS = {
     ],
     lootTable: DEFAULT_LOOT_TABLE,
     BossClass: Boss,
-    hintText: 'Rübenfeld: räum das Feld, dann durchs Tor zu Baron Rudibert. [E] Inventar',
+    hintText: 'Rübenfeld: erkunde das Dorf, räum das Feld, dann durchs Tor. [I] Inventar, [E] Türen',
     gateWarnText: 'Erst die Wachen im Feld vertreiben!',
     arenaGreeting: 'Baron Rudibert: "Wer WAGT es, mein Rübenfeld zu betreten?!"',
     victoryText: 'Baron Rudibert ergibt sich unter Gemüse und Tränen!',
@@ -147,7 +169,7 @@ const ISLAND_CONFIGS = {
     ],
     lootTable: ['potion', 'potion', 'melon'],
     BossClass: DukeGrendal,
-    hintText: 'Eisenklamm: räum die Minenwachen, dann durchs Tor zu Eisenherzog Grendal. [E] Inventar',
+    hintText: 'Eisenklamm: räum die Minenwachen, dann durchs Tor zu Eisenherzog Grendal. [I] Inventar',
     gateWarnText: 'Erst die Wachen in der Klamm vertreiben!',
     arenaGreeting: 'Eisenherzog Grendal: "Wer WAGT es, meine Klamm zu betreten?!"',
     victoryText: 'Eisenherzog Grendal kippt erschöpft in die Knie - Eisenklamm ist erobert!',
@@ -165,10 +187,16 @@ export default class IslandScene extends Phaser.Scene {
     this.inBossRoom = false;
     this.outdoorEnemyCount = 0;
     this.fogZones = [];
+    // If we're returning from an interior shop, respawn the player at
+    // the door they came out of. Otherwise fall back to PLAYER_START.
+    this.returningFromInterior = !!data?.returningFromInterior;
+    this.spawnX = data?.returnX;
+    this.spawnY = data?.returnY;
   }
 
   create() {
     const cfg = this.cfg;
+    ensureCurrency(this.registry);
     // physics bounds are inset to the grass+beach (excludes the outer water
     // ring), so the player/enemies simply cannot walk out to sea - no water
     // collision geometry needed. Camera bounds cover the full map including
@@ -248,7 +276,9 @@ export default class IslandScene extends Phaser.Scene {
     this.gateZone.body.setAllowGravity(false);
     this.gateZone.body.moves = false;
 
-    this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
+    const startX = this.returningFromInterior && this.spawnX ? this.spawnX : PLAYER_START.x;
+    const startY = this.returningFromInterior && this.spawnY ? this.spawnY : PLAYER_START.y;
+    this.player = new Player(this, startX, startY);
     this.attachShadow(this.player, { scaleX: 1, alpha: 0.55 });
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.enemies = this.physics.add.group();
@@ -258,6 +288,13 @@ export default class IslandScene extends Phaser.Scene {
 
     if (cfg.hasVillage) this.buildVillage();
     else this.buildMineCamp();
+    // Elevation terrace: draws a horizontal ridge of stone-wall tiles
+    // across the field so the arena visually sits on higher ground. A
+    // single ramp lets the path through - collision is added along the
+    // rest of the ridge so the player is forced to go through the ramp.
+    this.buildElevationTerrace();
+    // Harbor: a wooden dock at the bottom-centre where the boat lands.
+    this.buildHarbor();
     this.spawnOutdoorEncounter();
     this.spawnOutdoorPickups();
     this.scatterDecorations();
@@ -337,20 +374,176 @@ export default class IslandScene extends Phaser.Scene {
     this.walls.add(rect);
   }
 
+  // Village = a proper little cluster: apothecary + smith at the top so
+  // the player passes them first coming from the harbor path, four
+  // cottages arranged around a central well, and an inn/stone house at
+  // the back. Winding paths connect them so it reads as a village, not a
+  // random line of buildings. Shop houses get door interaction zones
+  // that hand the scene off to InteriorScene when overlapped.
   buildVillage() {
+    // Well at the visual centre of the village strip.
+    const wellX = VX(VILLAGE_W / 2);
+    const wellY = FY(FIELD_H / 2);
+
+    // Paint a spider-web of dirt paths between well, harbor, houses and
+    // the exit into the field. This is purely visual - the collision is
+    // per-house.
+    const cfg = this.cfg;
+    const paintPath = (x0, y0, x1, y1) => {
+      const steps = Math.max(4, Math.round(Phaser.Math.Distance.Between(x0, y0, x1, y1) / (T / 2)));
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const x = Math.round((x0 + (x1 - x0) * t) / T) * T + T / 2;
+        const y = Math.round((y0 + (y1 - y0) * t) / T) * T + T / 2;
+        this.add.image(x, y, cfg.pathTile).setDepth(0.5);
+      }
+    };
+
+    // Layout: coordinates are local to the village strip (VX/FY-wrapped).
     const houses = [
-      { key: 'house_stone', x: VX(60), y: FY(140), colW: 34, colH: 18 },
-      { key: 'house_timber', x: VX(220), y: FY(340), colW: 42, colH: 20 },
-      { key: 'house_inn', x: VX(70), y: FY(560), colW: 56, colH: 22 },
+      // Two shops right on the main path so they're findable.
+      { key: 'house_apothecary', x: VX(200), y: FY(220), colW: 56, colH: 22, shop: 'apothecary', label: 'Apotheke' },
+      { key: 'house_smith',      x: VX(440), y: FY(220), colW: 60, colH: 24, shop: 'smith',      label: 'Schmiede' },
+      // Cottages arranged around the well.
+      { key: 'house_cottage_a',  x: VX(120), y: FY(500), colW: 48, colH: 20 },
+      { key: 'house_cottage_b',  x: VX(240), y: FY(620), colW: 52, colH: 22 },
+      { key: 'house_cottage_a',  x: VX(430), y: FY(500), colW: 48, colH: 20 },
+      { key: 'house_cottage_b',  x: VX(540), y: FY(620), colW: 52, colH: 22 },
+      // Back-of-village landmarks.
+      { key: 'house_stone',      x: VX(90),  y: FY(820), colW: 40, colH: 18 },
+      { key: 'house_inn',        x: VX(460), y: FY(880), colW: 60, colH: 24 },
     ];
-    houses.forEach(({ key, x, y, colW, colH }) => {
+
+    // Paths: from harbor spine up through village into field.
+    paintPath(wellX, wellY, VX(200), FY(240));
+    paintPath(wellX, wellY, VX(440), FY(240));
+    paintPath(wellX, wellY, VX(240), FY(600));
+    paintPath(wellX, wellY, VX(430), FY(500));
+    paintPath(wellX, wellY, VX(540), FY(600));
+    paintPath(wellX, wellY, VX(460), FY(860));
+
+    // Well decoration + collision.
+    const well = this.add.image(wellX, wellY, 'well').setOrigin(0.5, 1).setDepth(wellY - 1);
+    this.houses.push(well);
+    const wellRect = this.add.rectangle(wellX, wellY - 20, 22, 22, 0, 0);
+    this.physics.add.existing(wellRect, true);
+    this.walls.add(wellRect);
+
+    // Door interaction zone group. Overlapping + [E] opens InteriorScene.
+    this.doorZones = [];
+
+    houses.forEach(({ key, x, y, colW, colH, shop, label }) => {
       const img = this.add.image(x, y, key).setOrigin(0.5, 1);
       img.setDepth(y - 1);
-      const rect = this.add.rectangle(x, y - colH / 2, colW, colH, 0x000000, 0);
+      // Collision on the building's footprint - a wide, shallow rectangle
+      // just below the sprite's baseline so the player can walk right up
+      // to the door but not through the walls.
+      const rect = this.add.rectangle(x, y - colH / 2, colW, colH, 0, 0);
       this.physics.add.existing(rect, true);
       this.walls.add(rect);
       this.houses.push(img);
+
+      if (shop) {
+        // Door zone sits just in front of the door - small so the toast
+        // triggers only when the player is actually next to it.
+        const zone = this.add.zone(x, y + 6, 28, 20);
+        this.physics.add.existing(zone, true);
+        zone.shopKind = shop;
+        zone.homeX = x;
+        zone.homeY = y + 20;
+        this.doorZones.push(zone);
+
+        // Sign in front of the door.
+        this.add
+          .text(x, y + 20, label, {
+            fontFamily: 'Georgia, serif',
+            fontSize: '10px',
+            color: '#f5cf4a',
+            stroke: '#000',
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5, 0)
+          .setDepth(y + 2);
+      }
     });
+
+    // Overlap: whenever the player stands on a shop door zone, show a
+    // little "press E" prompt. Actual entry is handled by a keydown-E
+    // listener that checks overlap on demand.
+    if (this.doorZones.length) {
+      this.doorZones.forEach((zone) => {
+        this.physics.add.overlap(this.player, zone, () => this.setNearDoor(zone));
+      });
+      this.input.keyboard.on('keydown-E', () => this.tryEnterDoor());
+    }
+  }
+
+  setNearDoor(zone) {
+    // Called every frame the player overlaps the zone. We latch the
+    // "currently near" pointer and clear it in the next update tick.
+    this._nearDoor = zone;
+    this._nearDoorFrame = this.time.now;
+  }
+
+  tryEnterDoor() {
+    // The [E] key is also bound to inventory-open in Player. We only
+    // hijack it when the player is actively next to a door AND no
+    // modal is open, so opening the shop and opening the inventory
+    // don't fight over the same key.
+    if (!this._nearDoor) return;
+    // Ignore stale overlap (older than 100ms).
+    if (this.time.now - (this._nearDoorFrame || 0) > 120) {
+      this._nearDoor = null;
+      return;
+    }
+    const zone = this._nearDoor;
+    this._nearDoor = null;
+    // Fade out then swap to interior.
+    this.cameras.main.fadeOut(180, 0, 0, 0);
+    this.time.delayedCall(200, () => {
+      this.scene.stop('UI');
+      this.scene.start('Interior', {
+        kind: zone.shopKind,
+        returnScene: 'Island',
+        returnX: zone.homeX,
+        returnY: zone.homeY,
+      });
+    });
+  }
+
+  // Ridge of stone-wall tiles running east-west across the field at
+  // ELEVATION_ROW, with a two-tile gap for the path ramp. Collision is
+  // applied everywhere except the ramp gap. Purely visual for the ramp
+  // itself (path tiles already painted).
+  buildElevationTerrace() {
+    const y = FY(ELEVATION_ROW * T + T);
+    const cols = FIELD_W / T;
+    const [g0, g1] = ELEVATION_RAMP_COLS;
+    for (let c = 0; c < cols; c++) {
+      if (c === g0 || c === g1) continue;
+      const x = FX(c * T + T / 2);
+      this.add.image(x, y, 'elevation_wall').setDepth(y - 4);
+    }
+    // Collision: two rectangles flanking the ramp gap.
+    if (g0 > 0) this.addWallRect(FX(0), y - T / 2, FX(g0 * T), y + T / 2);
+    if (g1 < cols - 1) this.addWallRect(FX((g1 + 1) * T), y - T / 2, FX(cols * T), y + T / 2);
+  }
+
+  // Wooden dock jutting into the beach ring where the boat parks. Purely
+  // decorative - the player is spawned on top of it.
+  buildHarbor() {
+    // Depth kept low so the player and NPCs draw ABOVE the dock plank.
+    this.add.image(HARBOR_X, HARBOR_Y, 'dock').setDepth(0);
+    this.add
+      .text(HARBOR_X, HARBOR_Y - 24, '⚓ Hafen', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '10px',
+        color: '#f5cf4a',
+        stroke: '#000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(HARBOR_Y + 2);
   }
 
   // Eisenklamm has no village - a couple of mine entrances dug into the
@@ -614,10 +807,47 @@ export default class IslandScene extends Phaser.Scene {
 
   tryDropLoot(enemy) {
     if (enemy === this.boss) return; // the boss has its own defeat flow
-    if (Math.random() > 0.35) return;
+    // Silver drop: always applies for regular enemies. Difficulty scales
+    // the raw silverDrop by silverMult so Easy runs feel richer and Hard
+    // runs feel scarce.
+    const diff = getDifficulty(this.registry);
+    if (enemy.silverDrop > 0) {
+      const amount = Math.max(1, Math.round(enemy.silverDrop * diff.silverMult));
+      addSilver(this.registry, amount);
+      this.spawnCoinPop(enemy.x, enemy.y, 'coin_silver', `+${amount}`);
+    }
+    // Item drop chance also scaled by difficulty (Easy 0.55, Hard 0.25).
+    if (Math.random() > diff.lootChance) return;
     const id = Phaser.Utils.Array.GetRandom(this.cfg.lootTable);
     const sprite = spawnPickup(this, id, enemy.x, enemy.y);
     this.pickups.add(sprite);
+  }
+
+  // Coin "pop" VFX: a coin icon floats up from the enemy's death spot and
+  // fades, with the amount as a floating number next to it. Purely visual,
+  // the actual currency is added instantly.
+  spawnCoinPop(x, y, textureKey, text) {
+    const coin = this.add.image(x, y, textureKey).setDepth(y + 20).setDisplaySize(14, 14);
+    const label = this.add
+      .text(x + 10, y, text, {
+        fontFamily: 'Courier New',
+        fontSize: '10px',
+        color: textureKey === 'coin_gold' ? '#f6d97a' : '#dfe6f0',
+        stroke: '#000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(y + 21);
+    this.tweens.add({
+      targets: [coin, label],
+      y: y - 22,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => {
+        coin.destroy();
+        label.destroy();
+      },
+    });
   }
 
   onBossThrowVeggie({ fromX, fromY, toX, toY }) {
@@ -700,7 +930,13 @@ export default class IslandScene extends Phaser.Scene {
     this.registry.set(`conquered_${this.islandKey}`, true);
     this.events.emit('toast', this.cfg.victoryText);
     Sfx.bossDefeat();
-    const potion = spawnPickup(this, 'potion', this.boss.x, this.boss.y);
+    // Gold drop: bosses reward 1 gold coin (before difficulty). Easy adds
+    // a bonus so easy runs feel especially generous, Hard trims it.
+    const diff = getDifficulty(this.registry);
+    const goldAmount = diff.id === 'easy' ? 2 : diff.id === 'hard' ? 1 : 1;
+    addGold(this.registry, goldAmount);
+    this.spawnCoinPop(this.boss.x, this.boss.y - 12, 'coin_gold', `+${goldAmount}`);
+    const potion = spawnPickup(this, 'potion_medium', this.boss.x, this.boss.y);
     this.pickups.add(potion);
     this.time.delayedCall(2200, () => this.showVictoryPrompt());
   }

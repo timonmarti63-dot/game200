@@ -60,6 +60,24 @@ const SPRITES = [
   'beach_edge',
   'slash_vfx',
   'spark',
+  // Village + shop overhaul
+  'dock',
+  'elevation_wall',
+  'shopkeeper_potion',
+  'shopkeeper_smith',
+  'coin_silver',
+  'coin_gold',
+  'tile_floor_wood',
+  'house_apothecary',
+  'house_smith',
+  'well',
+  'arena_gatehouse',
+  'potion_medium',
+  'potion_large',
+  'armor_iron',
+  'armor_plate',
+  'house_cottage_a',
+  'house_cottage_b',
 ];
 
 export default class BootScene extends Phaser.Scene {

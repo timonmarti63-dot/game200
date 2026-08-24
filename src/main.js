@@ -1,9 +1,12 @@
 import Phaser from 'phaser';
 import BootScene from './scenes/BootScene.js';
 import TitleScene from './scenes/TitleScene.js';
+import DifficultyScene from './scenes/DifficultyScene.js';
 import TutorialScene from './scenes/TutorialScene.js';
 import SailingScene from './scenes/SailingScene.js';
 import IslandScene from './scenes/IslandScene.js';
+import InteriorScene from './scenes/InteriorScene.js';
+import ShopScene from './scenes/ShopScene.js';
 import UIScene from './scenes/UIScene.js';
 import InventoryScene from './scenes/InventoryScene.js';
 
@@ -28,7 +31,18 @@ const config = {
     width: 480,
     height: 320,
   },
-  scene: [BootScene, TitleScene, TutorialScene, SailingScene, IslandScene, UIScene, InventoryScene],
+  scene: [
+    BootScene,
+    TitleScene,
+    DifficultyScene,
+    TutorialScene,
+    SailingScene,
+    IslandScene,
+    InteriorScene,
+    ShopScene,
+    UIScene,
+    InventoryScene,
+  ],
 };
 
 window.game = new Phaser.Game(config);

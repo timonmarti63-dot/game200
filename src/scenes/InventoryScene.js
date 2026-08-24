@@ -68,7 +68,7 @@ export default class InventoryScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
 
     this.add
-      .text(width / 2, height - 14, 'Klick: ausrüsten / in Hotbar legen     [E] oder [Esc]: schließen', {
+      .text(width / 2, height - 14, 'Klick: ausrüsten / in Hotbar legen     [I] oder [Esc]: schließen', {
         fontFamily: 'Courier New',
         fontSize: '10px',
         color: '#9fb0c9',

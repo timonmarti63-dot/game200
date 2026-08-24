@@ -6,7 +6,7 @@ const MELEE_RANGE = 70;
 
 export default class Boss extends Enemy {
   constructor(scene, x, y) {
-    super(scene, x, y, 'boss_rudibert', { hp: 22, speed: 32, contactDamage: 1 });
+    super(scene, x, y, 'boss_rudibert', { hp: 22, speed: 32, contactDamage: 1, isBoss: true });
     this.setSize(32, 20).setOffset(8, 27);
     this.name = 'Baron Rudibert';
     this.actionCooldownUntil = 0;

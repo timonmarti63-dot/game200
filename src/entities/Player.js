@@ -3,6 +3,7 @@ import { INSULTS } from '../systems/Insults.js';
 import { ITEMS } from '../systems/Items.js';
 import Inventory from '../systems/Inventory.js';
 import { Sfx } from '../systems/Sfx.js';
+import { getDifficulty } from '../systems/Difficulty.js';
 
 const SPEED = 118;
 const GRAIL_SPEED = 210;
@@ -31,8 +32,11 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.sword.setVisible(false);
 
     this.inventory = new Inventory(this);
-    this.baseMaxHp = BASE_MAX_HP;
-    this.maxHp = BASE_MAX_HP;
+    // Difficulty picks the base HP pool. Falls back to the historical
+    // Medium value if no difficulty has been chosen yet.
+    const diff = getDifficulty(scene.registry);
+    this.baseMaxHp = diff.playerMaxHp ?? BASE_MAX_HP;
+    this.maxHp = this.baseMaxHp;
     this.hp = this.maxHp;
     this.facing = new Phaser.Math.Vector2(0, 1);
     this.facingName = 'down';
@@ -64,7 +68,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       dodge2: Phaser.Input.Keyboard.KeyCodes.K,
       parry: Phaser.Input.Keyboard.KeyCodes.Q,
       parry2: Phaser.Input.Keyboard.KeyCodes.L,
-      inventory: Phaser.Input.Keyboard.KeyCodes.E,
+      // Inventory moved from E to I so E is free for door / shop
+      // interaction (Pokemon-style). I is standard for inventories.
+      inventory: Phaser.Input.Keyboard.KeyCodes.I,
       grapple: Phaser.Input.Keyboard.KeyCodes.F,
       hot1: Phaser.Input.Keyboard.KeyCodes.ONE,
       hot2: Phaser.Input.Keyboard.KeyCodes.TWO,
@@ -150,7 +156,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.handleInventoryKey(time);
     this.updateWalkBob(delta);
 
-    this.sword.setPosition(this.x, this.y);
+    // Keep the sword anchored in front of the player while a swing is
+    // running. When not attacking, hide the sword so idle Rüdiger doesn't
+    // carry a stray sprite pinned to him.
+    if (this._swingActiveUntil && time < this._swingActiveUntil) {
+      const offset = this._swingPivotOffset ?? 12;
+      this.sword.setPosition(this.x + this.facing.x * offset, this.y + this.facing.y * offset);
+    }
     this.setFlipX(this.facing.x < 0);
   }
 
@@ -197,16 +209,46 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     const grailActive = time < this.grailActiveUntil;
     this.attackReadyAt = time + (grailActive ? weapon.cooldown * 0.55 : weapon.cooldown);
 
-    const angle = this.facing.angle();
+    // Real weapon SWING: the sword sweeps ~120° across the player's facing
+    // direction, tip trailing behind then whipping forward, then quickly
+    // fades. The reach is offset from the player so the sprite doesn't just
+    // sit on top of Rüdiger. Origin (0.5, 1) means the pivot is at the
+    // handle so rotation looks like a real hand-held swing, not a spin.
+    const baseAngle = this.facing.angle() + Math.PI / 2; // texture-up along facing
+    const arc = Math.PI * 0.66; // ~120° arc
+    const startAngle = baseAngle - arc / 2;
+    const endAngle = baseAngle + arc / 2;
+    const offset = 12;
+    const pivotX = this.x + this.facing.x * offset;
+    const pivotY = this.y + this.facing.y * offset;
+
     this.sword.setTexture(weapon.texture);
-    this.sword.setVisible(true);
-    this.sword.setRotation(angle + Math.PI / 2);
+    this.sword.setPosition(pivotX, pivotY);
+    this.sword.setRotation(startAngle);
     this.sword.setAlpha(1);
-    this.scene.tweens.add({
+    this.sword.setScale(1);
+    this.sword.setVisible(true);
+
+    // A single tween drives the whole swing; the follow-in updater keeps
+    // the sword anchored in front of the player as they move.
+    if (this._swingTween) this._swingTween.stop();
+    this._swingActiveUntil = time + 220;
+    this._swingPivotOffset = offset;
+    this._swingTween = this.scene.tweens.add({
       targets: this.sword,
-      alpha: 0,
-      duration: 220,
-      onComplete: () => this.sword.setVisible(false),
+      rotation: endAngle,
+      scale: { from: 0.9, to: 1.15 },
+      duration: 180,
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        this.scene.tweens.add({
+          targets: this.sword,
+          alpha: 0,
+          scale: 1,
+          duration: 90,
+          onComplete: () => this.sword.setVisible(false),
+        });
+      },
     });
 
     this.scene.events.emit('playerAttack', {

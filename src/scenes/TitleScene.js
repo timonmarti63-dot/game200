@@ -63,15 +63,15 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     Sfx.unlock();
+    // Every run picks a difficulty first (defaults to Medium once selected).
     const startGame = () => {
       Sfx.unlock();
-      if (this.registry.get('tutorialSeen')) this.scene.start('Sailing');
-      else this.scene.start('Tutorial');
+      this.scene.start('Difficulty');
     };
     const skipToSailing = () => {
       Sfx.unlock();
       this.registry.set('tutorialSeen', true);
-      this.scene.start('Sailing');
+      this.scene.start('Difficulty');
     };
     const replayTutorial = () => this.scene.start('Tutorial');
     this.input.keyboard.once('keydown-SPACE', startGame);

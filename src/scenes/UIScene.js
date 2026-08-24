@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { ITEMS } from '../systems/Items.js';
 import { MAP_INFO } from './IslandScene.js';
+import { getSilver, getGold, ensureInitialised } from '../systems/Currency.js';
 
 const MINIMAP_X = 10;
 const MINIMAP_Y = 10;
 const MINIMAP_W = 96;
-const MAX_HEART_SLOTS = 6;
+const MAX_HEART_SLOTS = 8; // Hard mode uses 3, Medium 5, Easy 8
 
 export default class UIScene extends Phaser.Scene {
   constructor() {
@@ -62,11 +63,17 @@ export default class UIScene extends Phaser.Scene {
     const gap = 6;
     const hotbarY = this.scale.height - 26;
     const startX = this.scale.width / 2 - ((4 * slotSize + 3 * gap) / 2) + slotSize / 2;
+    // Hotbar item icons need a constant on-screen size regardless of the
+    // texture's native pixel dimensions (a 44px player sprite vs a 12px
+    // silver coin would otherwise look wildly inconsistent). We store the
+    // target inner size on the scene and re-apply setDisplaySize every
+    // time we swap the icon's texture in updateHotbar.
+    this.hotbarIconSize = slotSize - 10;
     this.hotbarSlots = [];
     for (let i = 0; i < 4; i++) {
       const x = startX + i * (slotSize + gap);
       const bg = this.add.rectangle(x, hotbarY, slotSize, slotSize, 0x14192a, 1).setStrokeStyle(1, 0x4a5578).setScrollFactor(0).setDepth(100);
-      const icon = this.add.image(x, hotbarY, 'whitepx').setVisible(false).setScrollFactor(0).setDepth(101).setDisplaySize(slotSize - 10, slotSize - 10);
+      const icon = this.add.image(x, hotbarY, 'whitepx').setVisible(false).setScrollFactor(0).setDepth(101).setDisplaySize(this.hotbarIconSize, this.hotbarIconSize);
       const label = this.add
         .text(x - slotSize / 2 + 3, hotbarY - slotSize / 2 + 1, String(i + 1), { fontFamily: 'Courier New', fontSize: '9px', color: '#8fa0c0' })
         .setScrollFactor(0)
@@ -104,6 +111,39 @@ export default class UIScene extends Phaser.Scene {
       .setDepth(100)
       .setAlpha(0);
 
+    // --- currency HUD (top right) ---
+    ensureInitialised(this.registry);
+    const cx = this.scale.width - 8;
+    const cy = 14;
+    this.silverIcon = this.add.image(cx - 62, cy, 'coin_silver').setScrollFactor(0).setDepth(100).setDisplaySize(12, 12);
+    this.silverText = this.add
+      .text(cx - 54, cy, '0', {
+        fontFamily: 'Courier New',
+        fontSize: '12px',
+        color: '#dfe6f0',
+        stroke: '#000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(100);
+    this.goldIcon = this.add.image(cx - 22, cy, 'coin_gold').setScrollFactor(0).setDepth(100).setDisplaySize(12, 12);
+    this.goldText = this.add
+      .text(cx - 14, cy, '0', {
+        fontFamily: 'Courier New',
+        fontSize: '12px',
+        color: '#f6d97a',
+        stroke: '#000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(100);
+    this.refreshCurrency();
+    // registry emits 'changedata-<key>' when a specific key changes.
+    this.registry.events.on('changedata-silver', this.refreshCurrency, this);
+    this.registry.events.on('changedata-gold', this.refreshCurrency, this);
+
     const island = this.scene.get(this.islandSceneKey);
     this.island = island;
     island.events.on('hpChanged', this.updateHearts, this);
@@ -127,6 +167,8 @@ export default class UIScene extends Phaser.Scene {
       island.events.off('inventoryChanged', this.updateHotbar, this);
       island.events.off('bossHpChanged', this.updateBossBar, this);
       island.events.off('toast', this.showToast, this);
+      this.registry.events.off('changedata-silver', this.refreshCurrency, this);
+      this.registry.events.off('changedata-gold', this.refreshCurrency, this);
     });
 
     if (island.player) {
@@ -161,13 +203,24 @@ export default class UIScene extends Phaser.Scene {
       const entry = inventory.hotbar[i];
       const def = entry ? ITEMS[entry.id] : null;
       if (def) {
-        slot.icon.setTexture(def.texture).setVisible(true);
+        // IMPORTANT: setTexture resets the sprite's display size to the
+        // texture's native size, so we must re-apply the target size on
+        // every swap - otherwise a 12x12 potion icon renders tiny in a
+        // 34px hotbar slot, and a 68x68 house icon (edge case) would
+        // overflow it.
+        slot.icon.setTexture(def.texture).setVisible(true).setDisplaySize(this.hotbarIconSize, this.hotbarIconSize);
         slot.qty.setText(entry.qty > 1 ? String(entry.qty) : '').setVisible(entry.qty > 1);
       } else {
         slot.icon.setVisible(false);
         slot.qty.setVisible(false);
       }
     });
+  }
+
+  refreshCurrency() {
+    if (!this.silverText) return;
+    this.silverText.setText(String(getSilver(this.registry)));
+    this.goldText.setText(String(getGold(this.registry)));
   }
 
   updateBossBar(hp, maxHp) {

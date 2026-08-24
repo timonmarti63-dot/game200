@@ -27,7 +27,7 @@ const PAGES = [
   },
   {
     title: 'Ausrüstung & Hotbar',
-    body: 'Auf Inseln findest du Waffen, Rüstung, Tränke und\nWurfgeschosse - manche liegen einfach herum, manche\nstecken in Truhen oder fallen von besiegten Gegnern.\nHotbar-Slots [1]-[4] benutzen. Inventar öffnen: [E].',
+    body: 'Auf Inseln findest du Waffen, Rüstung, Tränke und\nWurfgeschosse - manche liegen einfach herum, manche\nstecken in Truhen oder fallen von besiegten Gegnern.\nHotbar-Slots [1]-[4] benutzen. Inventar öffnen: [I]. Türen/Shops: [E].',
     art: 'chest',
     artScale: 1.6,
   },

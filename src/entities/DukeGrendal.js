@@ -21,7 +21,7 @@ const GRENDAL_LINES = [
 // exhausted (= vulnerable, bonus-damage) stumble a few seconds later.
 export default class DukeGrendal extends Enemy {
   constructor(scene, x, y) {
-    super(scene, x, y, 'boss_grendal', { hp: 26, speed: 30, contactDamage: 1 });
+    super(scene, x, y, 'boss_grendal', { hp: 26, speed: 30, contactDamage: 1, isBoss: true });
     this.setSize(34, 22).setOffset(8, 30);
     this.name = 'Eisenherzog Grendal';
     this.actionCooldownUntil = 0;
