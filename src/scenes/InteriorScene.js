@@ -56,27 +56,54 @@ export default class InteriorScene extends Phaser.Scene {
     // Wooden floor - tiled 32x32.
     this.add.tileSprite(ROOM_W / 2, ROOM_H / 2, ROOM_W, ROOM_H, 'tile_floor_wood').setDepth(0);
 
-    // Wooden walls (stone-tile as a fallback base) framing the room -
-    // a top strip and thin side/bottom strips give the Pokemon-style
-    // "interior box" feel.
+    // Warm floor rug down the middle for a Pokemon-style focal walkway.
+    this.add.image(ROOM_W / 2, ROOM_H - 90, 'furn_rug').setDepth(0.5);
+
+    // Wooden walls framing the room. Top strip is thicker; the trim
+    // lines give the classic Pokemon interior "deep back wall" look.
     this.add.rectangle(ROOM_W / 2, T, ROOM_W, 2 * T, cfg.wallColor, 1).setDepth(1);
     this.add.rectangle(ROOM_W / 2, T, ROOM_W, 2, 0x2a1a10, 1).setDepth(1);
     this.add.rectangle(ROOM_W / 2, 2 * T + 1, ROOM_W, 2, 0x2a1a10, 1).setDepth(1);
 
+    // Framed painting hangs above the counter as a wall decoration.
+    this.add.image(ROOM_W / 2, 20, 'furn_painting').setDepth(1.1);
+
+    // Furniture along the walls creates a lived-in Pokemon-style room.
+    // Left wall: bookshelf + potted plant.
+    this.add.image(60, 62, 'furn_bookshelf').setOrigin(0.5, 0.5).setDepth(1.5);
+    this.add.image(60, ROOM_H - 100, 'furn_plant_pot').setOrigin(0.5, 0.5).setDepth(ROOM_H - 100 + 0.5);
+    // Right wall: kitchen bench (only in apothecary) or crate stack (smith).
+    if (cfg.shopKind === 'apothecary') {
+      this.add.image(ROOM_W - 80, 58, 'furn_kitchen').setOrigin(0.5, 0.5).setDepth(1.5);
+      this.add.image(ROOM_W - 60, ROOM_H - 110, 'furn_plant_pot').setOrigin(0.5, 0.5).setDepth(ROOM_H - 110 + 0.5);
+    } else {
+      // Smith - stack a few crates + an anvil-suggesting square
+      this.add.image(ROOM_W - 50, 60, 'furn_crate').setDepth(1.5);
+      this.add.image(ROOM_W - 90, 68, 'furn_crate').setDepth(1.6);
+      this.add.image(ROOM_W - 65, ROOM_H - 110, 'furn_crate').setDepth(ROOM_H - 110 + 0.5);
+    }
+    // A round table with an item sits in a front corner for warmth.
+    this.add.image(80, ROOM_H - 70, 'furn_table_round').setOrigin(0.5, 0.5).setDepth(ROOM_H - 70 + 0.5);
+    // An armchair opposite the table.
+    this.add.image(ROOM_W - 90, ROOM_H - 68, 'furn_armchair').setOrigin(0.5, 0.5).setDepth(ROOM_H - 68 + 0.5);
+
     // A trio of decorative shelves along the back wall (potions or weapons).
     const shelfTexture = cfg.shopKind === 'apothecary' ? 'potion' : 'sword';
     const shelfAlt = cfg.shopKind === 'apothecary' ? 'potion_medium' : 'warhammer';
-    for (let i = 0; i < 4; i++) {
-      const sx = 60 + i * 90;
-      const sy = 42;
-      this.add.rectangle(sx, sy, 70, 6, 0x3a2818, 1).setDepth(2);
-      this.add.image(sx - 18, sy - 12, shelfTexture).setDepth(3);
-      this.add.image(sx + 18, sy - 14, shelfAlt).setDepth(3);
+    for (let i = 0; i < 3; i++) {
+      const sx = 130 + i * 75;
+      const sy = 40;
+      this.add.rectangle(sx, sy, 60, 5, 0x3a2818, 1).setDepth(2);
+      this.add.image(sx - 14, sy - 11, shelfTexture).setDepth(3);
+      this.add.image(sx + 14, sy - 13, shelfAlt).setDepth(3);
     }
 
     // Counter running horizontally at 60% height.
     const counterY = ROOM_H * 0.55;
-    this.counter = this.add.rectangle(ROOM_W / 2, counterY, ROOM_W - 120, 20, cfg.counterColor, 1).setStrokeStyle(2, 0x1a0f08).setDepth(2);
+    // Compact Pokemon-style counter with a warm top and darker front.
+    this.counter = this.add.rectangle(ROOM_W / 2, counterY, ROOM_W - 240, 14, cfg.counterColor, 1).setStrokeStyle(2, 0x1a0f08).setDepth(2);
+    // Counter front (darker strip) sold as a 3D-ish base.
+    this.add.rectangle(ROOM_W / 2, counterY + 8, ROOM_W - 240, 4, 0x2a1810, 1).setDepth(2.1);
 
     // Shopkeeper standing behind the counter.
     this.shopkeeper = this.add.image(ROOM_W / 2, counterY - 22, cfg.shopkeeper).setDepth(3);

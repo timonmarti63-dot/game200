@@ -21,12 +21,13 @@ const T = 32;
 // into absolute world coordinates, shifted right to make room for a village.
 const OFFSET = 96;
 const BEACH_MARGIN = 32;
-// Bigger island: village is now a real 20-tile-wide strip and the field
-// grows to 48x36 so exploration takes real time. This also makes room
-// for the arena-on-hill terrace at the top-right corner.
-const VILLAGE_W = 20 * T;
-const FIELD_W = 48 * T;
-const FIELD_H = 36 * T;
+// Bigger, more sprawling island: the village strip stays but the field
+// grows to 64x48 so there are real corners to explore, hidden pockets
+// tucked behind rock formations, and enough room for the arena-house
+// on its elevated terrace at the very north.
+const VILLAGE_W = 22 * T;
+const FIELD_W = 64 * T;
+const FIELD_H = 48 * T;
 const GRASS_W = VILLAGE_W + FIELD_W;
 const GRASS_H = FIELD_H;
 const OUTDOOR_W = GRASS_W + OFFSET * 2;
@@ -41,10 +42,10 @@ const FX = (x) => OFFSET + VILLAGE_W + x;
 const FY = (y) => OFFSET + y;
 const VX = (x) => OFFSET + x; // village-strip local -> absolute (shares the y axis with FY)
 
-// The castle now sits at the far NORTH of the field, on the elevated
-// terrace ("arena hill"). Its bottom row is the gatehouse that faces
-// south so the player approaches it up the path.
-const CASTLE_LOCAL_COL = 16;
+// The arena-house sits on the elevated terrace at the north. It looks
+// like an oversized manor from the outside - the actual boss arena is
+// entered by walking into the black doorframe portal at its base.
+const CASTLE_LOCAL_COL = 22;
 const CASTLE_LOCAL_ROW = 3;
 const CASTLE_ORIGIN_X = FX(CASTLE_LOCAL_COL * T);
 const CASTLE_ORIGIN_Y = FY(CASTLE_LOCAL_ROW * T);
@@ -55,17 +56,18 @@ const GATE_GAP_COLS = [4, 5];
 const GATE_ZONE = { x: CASTLE_ORIGIN_X + 4.5 * T, y: CASTLE_ORIGIN_Y + 5 * T };
 
 // The path spine runs from the harbor at the bottom, past the village,
-// through the field, and up the elevation ramp to the gate.
-const PATH_COL_A = 22;
-const PATH_COL_B = 23;
+// through the field, and up the elevation ramp to the arena-house. It
+// no longer draws as two rigid tile columns - see paintNaturalPath.
+const PATH_COL_A = 28;
+const PATH_COL_B = 29;
 // The player now spawns on the dock instead of a random path tile, so
 // they visibly "disembark" from the boat.
 const PLAYER_START = { x: HARBOR_X, y: HARBOR_Y - 8 };
 
 // Elevation terrace: a raised plateau at the north of the field that
 // hosts the arena and connects to the field via a single central ramp.
-const ELEVATION_ROW = 8; // bottom edge of the terrace in field-local rows
-const ELEVATION_RAMP_COLS = [PATH_COL_A - 16, PATH_COL_B - 16]; // ramp gap
+const ELEVATION_ROW = 10; // bottom edge of the terrace in field-local rows
+const ELEVATION_RAMP_COLS = [PATH_COL_A - 22, PATH_COL_B - 22]; // ramp gap
 
 const ARENA_X = OUTDOOR_W + 120;
 const ARENA_Y = 0;
@@ -253,29 +255,32 @@ export default class IslandScene extends Phaser.Scene {
       .tileSprite(ARENA_X, ARENA_Y, ARENA_W, ARENA_H, cfg.floorTile)
       .setOrigin(0, 0);
 
-    // path: village spine + castle approach
-    const fieldRows = FIELD_H / T;
-    for (let r = 8; r < fieldRows; r++) {
-      this.add.image(FX(PATH_COL_A * T + 16), FY(r * T + 16), cfg.pathTile);
-      this.add.image(FX(PATH_COL_B * T + 16), FY(r * T + 16), cfg.pathTile);
-    }
-    const villageRows = GRASS_H / T;
-    for (let vr = 0; vr < villageRows; vr++) {
-      this.add.image(VX(4 * T + 16), FY(vr * T + 16), cfg.pathTile);
-      this.add.image(VX(5 * T + 16), FY(vr * T + 16), cfg.pathTile);
-    }
+    // Natural, meandering path system. Instead of rigid tile columns, we
+    // trace a spine of points from the harbor up through the field to the
+    // arena hill, with soft sine-based drift so it feels hand-drawn.
+    this.paintNaturalMainPath();
 
     this.walls = this.physics.add.staticGroup();
-    this.buildWallVisuals(CASTLE_ORIGIN_X, CASTLE_ORIGIN_Y, CASTLE_COLS, CASTLE_ROWS, GATE_GAP);
-    this.buildWallVisuals(ARENA_X, ARENA_Y, ARENA_COLS, ARENA_ROWS, null);
-    this.buildWallRing(CASTLE_ORIGIN_X, CASTLE_ORIGIN_Y, CASTLE_COLS, CASTLE_ROWS, GATE_GAP_COLS);
-    this.buildWallRing(ARENA_X, ARENA_Y, ARENA_COLS, ARENA_ROWS, null);
+    this.warpZones = []; // collected while building village/arena, wired to player after spawn
+    this.houses = [];
 
-    this.gateZone = this.add.zone(GATE_ZONE.x, GATE_ZONE.y, 70, 34);
-    this.physics.add.existing(this.gateZone);
-    this.gateZone.body.setAllowGravity(false);
-    this.gateZone.body.moves = false;
+    if (cfg.hasVillage) this.buildVillage();
+    else this.buildMineCamp();
+    // Elevation terrace: raised plateau at the north with a single central
+    // ramp; rock collision everywhere except the ramp gap.
+    this.buildElevationTerrace();
+    // Harbor: a wooden dock at the bottom-centre where the boat lands.
+    this.buildHarbor();
+    // The arena exterior is a manor-style house sitting on the terrace,
+    // with a black doorway portal (walk-through warp) at its base.
+    this.buildArenaHouse();
+    // Discovery pockets: rock circles hiding chests, sparse cottages in
+    // the far corners of the field. Purely optional exploration.
+    this.buildDiscoveryPockets();
 
+    // Player spawn now happens AFTER the world is built (so warp zones
+    // exist and can be wired to overlaps). If we're returning from an
+    // interior, use the door-return coordinates.
     const startX = this.returningFromInterior && this.spawnX ? this.spawnX : PLAYER_START.x;
     const startY = this.returningFromInterior && this.spawnY ? this.spawnY : PLAYER_START.y;
     this.player = new Player(this, startX, startY);
@@ -284,17 +289,7 @@ export default class IslandScene extends Phaser.Scene {
     this.enemies = this.physics.add.group();
     this.pickups = this.physics.add.group();
     this.projectiles = this.physics.add.group();
-    this.houses = [];
 
-    if (cfg.hasVillage) this.buildVillage();
-    else this.buildMineCamp();
-    // Elevation terrace: draws a horizontal ridge of stone-wall tiles
-    // across the field so the arena visually sits on higher ground. A
-    // single ramp lets the path through - collision is added along the
-    // rest of the ridge so the player is forced to go through the ramp.
-    this.buildElevationTerrace();
-    // Harbor: a wooden dock at the bottom-centre where the boat lands.
-    this.buildHarbor();
     this.spawnOutdoorEncounter();
     this.spawnOutdoorPickups();
     this.scatterDecorations();
@@ -306,8 +301,18 @@ export default class IslandScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => this.onPlayerEnemyContact(enemy));
     this.physics.add.overlap(this.player, this.pickups, (player, item) => this.onPlayerPickup(item));
-    this.physics.add.overlap(this.player, this.gateZone, () => this.onGateOverlap());
     this.physics.add.overlap(this.projectiles, this.enemies, (proj, enemy) => resolveProjectileHitEnemy(this, proj, enemy));
+
+    // Pokemon-style warp triggers: walking into any warp zone teleports
+    // the player to a different scene / coordinates. Zones are grace-
+    // period gated so the player can't instantly re-trigger the zone
+    // they just emerged from.
+    this.warpZones.forEach((zone) => {
+      this.physics.add.overlap(this.player, zone, () => this.triggerWarp(zone));
+    });
+    // If we just came back from an interior, give a 700ms grace period
+    // so the player can walk away from the doorway before re-entering.
+    this._warpGraceUntil = this.time.now + 700;
 
     this.events.on('playerAttack', this.onPlayerAttack, this);
     this.events.on('playerParry', this.onPlayerParry, this);
@@ -374,53 +379,58 @@ export default class IslandScene extends Phaser.Scene {
     this.walls.add(rect);
   }
 
-  // Village = a proper little cluster: apothecary + smith at the top so
-  // the player passes them first coming from the harbor path, four
-  // cottages arranged around a central well, and an inn/stone house at
-  // the back. Winding paths connect them so it reads as a village, not a
-  // random line of buildings. Shop houses get door interaction zones
-  // that hand the scene off to InteriorScene when overlapped.
+  // Village: a proper cluster with two shops on the main street, cottages
+  // around a central well, and back-of-village landmarks. Doors are drawn
+  // as BLACK PORTAL RECTANGLES sunk into the house sprite; walking into
+  // them (overlap, no key needed) warps to the InteriorScene.
   buildVillage() {
-    // Well at the visual centre of the village strip.
+    const cfg = this.cfg;
     const wellX = VX(VILLAGE_W / 2);
     const wellY = FY(FIELD_H / 2);
 
-    // Paint a spider-web of dirt paths between well, harbor, houses and
-    // the exit into the field. This is purely visual - the collision is
-    // per-house.
-    const cfg = this.cfg;
-    const paintPath = (x0, y0, x1, y1) => {
-      const steps = Math.max(4, Math.round(Phaser.Math.Distance.Between(x0, y0, x1, y1) / (T / 2)));
+    // Village-local winding paths between well, houses, harbor, field exit.
+    const paintCurvedPath = (x0, y0, x1, y1, drift = 20) => {
+      const dist = Phaser.Math.Distance.Between(x0, y0, x1, y1);
+      const steps = Math.max(8, Math.round(dist / (T / 2)));
+      // perpendicular unit vector for the sine drift
+      const dx = (x1 - x0) / dist;
+      const dy = (y1 - y0) / dist;
+      const px = -dy;
+      const py = dx;
       for (let s = 0; s <= steps; s++) {
         const t = s / steps;
-        const x = Math.round((x0 + (x1 - x0) * t) / T) * T + T / 2;
-        const y = Math.round((y0 + (y1 - y0) * t) / T) * T + T / 2;
+        // ease-in / ease-out drift so ends land on target
+        const wave = Math.sin(t * Math.PI) * drift * (Math.sin(t * Math.PI * 2) * 0.4 + 1);
+        const rx = x0 + (x1 - x0) * t + px * wave;
+        const ry = y0 + (y1 - y0) * t + py * wave;
+        const x = Math.round(rx / (T / 2)) * (T / 2);
+        const y = Math.round(ry / (T / 2)) * (T / 2);
         this.add.image(x, y, cfg.pathTile).setDepth(0.5);
       }
     };
 
-    // Layout: coordinates are local to the village strip (VX/FY-wrapped).
+    // House layout - spread more widely across the bigger village strip.
     const houses = [
-      // Two shops right on the main path so they're findable.
-      { key: 'house_apothecary', x: VX(200), y: FY(220), colW: 56, colH: 22, shop: 'apothecary', label: 'Apotheke' },
-      { key: 'house_smith',      x: VX(440), y: FY(220), colW: 60, colH: 24, shop: 'smith',      label: 'Schmiede' },
-      // Cottages arranged around the well.
-      { key: 'house_cottage_a',  x: VX(120), y: FY(500), colW: 48, colH: 20 },
-      { key: 'house_cottage_b',  x: VX(240), y: FY(620), colW: 52, colH: 22 },
-      { key: 'house_cottage_a',  x: VX(430), y: FY(500), colW: 48, colH: 20 },
-      { key: 'house_cottage_b',  x: VX(540), y: FY(620), colW: 52, colH: 22 },
-      // Back-of-village landmarks.
-      { key: 'house_stone',      x: VX(90),  y: FY(820), colW: 40, colH: 18 },
-      { key: 'house_inn',        x: VX(460), y: FY(880), colW: 60, colH: 24 },
+      { key: 'house_apothecary', x: VX(220), y: FY(260), colW: 56, colH: 22, shop: 'apothecary', label: 'Apotheke' },
+      { key: 'house_smith',      x: VX(500), y: FY(260), colW: 60, colH: 24, shop: 'smith',      label: 'Schmiede' },
+      { key: 'house_cottage_a',  x: VX(130), y: FY(560), colW: 48, colH: 20 },
+      { key: 'house_cottage_b',  x: VX(270), y: FY(700), colW: 52, colH: 22 },
+      { key: 'house_cottage_a',  x: VX(470), y: FY(560), colW: 48, colH: 20 },
+      { key: 'house_cottage_b',  x: VX(600), y: FY(700), colW: 52, colH: 22 },
+      { key: 'house_stone',      x: VX(100), y: FY(920), colW: 40, colH: 18 },
+      { key: 'house_inn',        x: VX(520), y: FY(1000),colW: 60, colH: 24 },
     ];
 
-    // Paths: from harbor spine up through village into field.
-    paintPath(wellX, wellY, VX(200), FY(240));
-    paintPath(wellX, wellY, VX(440), FY(240));
-    paintPath(wellX, wellY, VX(240), FY(600));
-    paintPath(wellX, wellY, VX(430), FY(500));
-    paintPath(wellX, wellY, VX(540), FY(600));
-    paintPath(wellX, wellY, VX(460), FY(860));
+    // Curved paths connecting well to key destinations.
+    paintCurvedPath(wellX, wellY, VX(220), FY(280), 14);
+    paintCurvedPath(wellX, wellY, VX(500), FY(280), 14);
+    paintCurvedPath(wellX, wellY, VX(270), FY(680), 18);
+    paintCurvedPath(wellX, wellY, VX(470), FY(540), 12);
+    paintCurvedPath(wellX, wellY, VX(600), FY(680), 22);
+    paintCurvedPath(wellX, wellY, VX(520), FY(980), 24);
+    // Spine: field exit down to harbor via well.
+    paintCurvedPath(wellX, FY(20), wellX, wellY, 26);
+    paintCurvedPath(wellX, wellY, HARBOR_X, HARBOR_Y - 20, 30);
 
     // Well decoration + collision.
     const well = this.add.image(wellX, wellY, 'well').setOrigin(0.5, 1).setDepth(wellY - 1);
@@ -429,33 +439,32 @@ export default class IslandScene extends Phaser.Scene {
     this.physics.add.existing(wellRect, true);
     this.walls.add(wellRect);
 
-    // Door interaction zone group. Overlapping + [E] opens InteriorScene.
-    this.doorZones = [];
-
     houses.forEach(({ key, x, y, colW, colH, shop, label }) => {
       const img = this.add.image(x, y, key).setOrigin(0.5, 1);
       img.setDepth(y - 1);
-      // Collision on the building's footprint - a wide, shallow rectangle
-      // just below the sprite's baseline so the player can walk right up
-      // to the door but not through the walls.
+      // Building footprint - a wide, shallow rectangle at the base.
       const rect = this.add.rectangle(x, y - colH / 2, colW, colH, 0, 0);
       this.physics.add.existing(rect, true);
       this.walls.add(rect);
       this.houses.push(img);
 
       if (shop) {
-        // Door zone sits just in front of the door - small so the toast
-        // triggers only when the player is actually next to it.
-        const zone = this.add.zone(x, y + 6, 28, 20);
+        // Black doorway portal painted into the base of the house so the
+        // player sees where to walk in. The doorway is COLLISION-CUT out
+        // of the house footprint above (colH stops just above the door).
+        this.paintDoorwayPortal(x, y);
+        // Warp zone right in the doorway.
+        const zone = this.add.zone(x, y - 4, 22, 12);
         this.physics.add.existing(zone, true);
+        zone.warpKind = 'shop';
         zone.shopKind = shop;
-        zone.homeX = x;
-        zone.homeY = y + 20;
-        this.doorZones.push(zone);
+        zone.returnX = x;
+        zone.returnY = y + 30;
+        this.warpZones.push(zone);
 
         // Sign in front of the door.
         this.add
-          .text(x, y + 20, label, {
+          .text(x, y + 22, label, {
             fontFamily: 'Georgia, serif',
             fontSize: '10px',
             color: '#f5cf4a',
@@ -466,48 +475,56 @@ export default class IslandScene extends Phaser.Scene {
           .setDepth(y + 2);
       }
     });
-
-    // Overlap: whenever the player stands on a shop door zone, show a
-    // little "press E" prompt. Actual entry is handled by a keydown-E
-    // listener that checks overlap on demand.
-    if (this.doorZones.length) {
-      this.doorZones.forEach((zone) => {
-        this.physics.add.overlap(this.player, zone, () => this.setNearDoor(zone));
-      });
-      this.input.keyboard.on('keydown-E', () => this.tryEnterDoor());
-    }
   }
 
-  setNearDoor(zone) {
-    // Called every frame the player overlaps the zone. We latch the
-    // "currently near" pointer and clear it in the next update tick.
-    this._nearDoor = zone;
-    this._nearDoorFrame = this.time.now;
+  // Paints a black doorway rectangle at (x,y) so each house has a real
+  // dark portal you can visibly walk into. Rendered slightly ABOVE the
+  // house baseline so it looks recessed into the wall.
+  paintDoorwayPortal(x, y, width = 20, height = 28) {
+    // Outer dark wooden frame.
+    this.add
+      .rectangle(x, y - height / 2 - 2, width + 6, height + 4, 0x2a1a0e)
+      .setDepth(y - 0.4);
+    // Black interior of the doorway.
+    this.add
+      .rectangle(x, y - height / 2 - 2, width, height, 0x000000)
+      .setDepth(y - 0.3);
+    // Blue-black highlight at the very top hints at receding depth.
+    this.add
+      .rectangle(x, y - height + 2, width - 6, 3, 0x0a1420, 0.75)
+      .setDepth(y - 0.2);
   }
 
-  tryEnterDoor() {
-    // The [E] key is also bound to inventory-open in Player. We only
-    // hijack it when the player is actively next to a door AND no
-    // modal is open, so opening the shop and opening the inventory
-    // don't fight over the same key.
-    if (!this._nearDoor) return;
-    // Ignore stale overlap (older than 100ms).
-    if (this.time.now - (this._nearDoorFrame || 0) > 120) {
-      this._nearDoor = null;
+  // Central warp dispatcher. Zones set their kind + payload; this decides
+  // what scene to load. Grace period prevents instant re-entry after
+  // returning from an interior.
+  triggerWarp(zone) {
+    if (this._warping) return;
+    if (this.time.now < (this._warpGraceUntil || 0)) return;
+    // Arena warp is guarded by the field-clear rule.
+    if (zone.warpKind === 'arena' && this.outdoorEnemyCount > 0) {
+      const now = this.time.now;
+      if (!this._gateWarnAt || now - this._gateWarnAt > 1500) {
+        this._gateWarnAt = now;
+        this.events.emit('toast', this.cfg.gateWarnText);
+      }
       return;
     }
-    const zone = this._nearDoor;
-    this._nearDoor = null;
-    // Fade out then swap to interior.
-    this.cameras.main.fadeOut(180, 0, 0, 0);
-    this.time.delayedCall(200, () => {
-      this.scene.stop('UI');
-      this.scene.start('Interior', {
-        kind: zone.shopKind,
-        returnScene: 'Island',
-        returnX: zone.homeX,
-        returnY: zone.homeY,
-      });
+    this._warping = true;
+    this.cameras.main.fadeOut(220, 0, 0, 0);
+    this.time.delayedCall(240, () => {
+      if (zone.warpKind === 'shop') {
+        this.scene.stop('UI');
+        this.scene.start('Interior', {
+          kind: zone.shopKind,
+          returnScene: 'Island',
+          returnX: zone.returnX,
+          returnY: zone.returnY,
+          islandKey: this.islandKey,
+        });
+      } else if (zone.warpKind === 'arena') {
+        this.enterBossArena();
+      }
     });
   }
 
@@ -527,6 +544,125 @@ export default class IslandScene extends Phaser.Scene {
     // Collision: two rectangles flanking the ramp gap.
     if (g0 > 0) this.addWallRect(FX(0), y - T / 2, FX(g0 * T), y + T / 2);
     if (g1 < cols - 1) this.addWallRect(FX((g1 + 1) * T), y - T / 2, FX(cols * T), y + T / 2);
+  }
+
+  // Natural, meandering main path from the harbor up through the field to
+  // the arena-house entrance. Sine drift + width variation gives it a
+  // hand-drawn feel instead of two rigid tile columns.
+  paintNaturalMainPath() {
+    const cfg = this.cfg;
+    const startX = HARBOR_X;
+    const startY = HARBOR_Y - 20;
+    const endX = CASTLE_ORIGIN_X + CASTLE_COLS * T / 2;
+    const endY = CASTLE_ORIGIN_Y + CASTLE_ROWS * T + 10;
+    const steps = 90;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      // Two-band sine drift so the path curves smoothly, more toward the middle.
+      const drift = Math.sin(t * Math.PI) * 42;
+      const wobble = Math.sin(t * Math.PI * 3.2) * 12;
+      const cx = startX + (endX - startX) * t + drift + wobble;
+      const cy = startY + (endY - startY) * t;
+      // Path is 2-tiles wide, softly varying.
+      const halfW = 1 + Math.round(Math.sin(t * Math.PI * 5) * 0.5);
+      for (let w = -halfW; w <= halfW; w++) {
+        const x = Math.round((cx + w * T) / T) * T + T / 2;
+        const y = Math.round(cy / T) * T + T / 2;
+        this.add.image(x, y, cfg.pathTile).setDepth(0.5);
+      }
+    }
+  }
+
+  // Arena EXTERIOR: a large manor-style building on the terrace, with a
+  // black doorway portal at its base. Walking into the portal warps to
+  // the boss-arena interior (which is a separate walled room already
+  // built at ARENA_X/ARENA_Y). Purely visual on the outside - collision
+  // is a big rectangle around the manor so you can't clip through.
+  buildArenaHouse() {
+    const houseX = CASTLE_ORIGIN_X + (CASTLE_COLS * T) / 2;
+    const houseY = CASTLE_ORIGIN_Y + CASTLE_ROWS * T; // baseline
+    // Big manor sprite. We reuse arena_gatehouse which was designed for
+    // exactly this purpose.
+    const img = this.add.image(houseX, houseY, 'arena_gatehouse').setOrigin(0.5, 1);
+    img.setDepth(houseY - 1);
+    this.houses.push(img);
+
+    // Collision: two rectangles flanking the doorway so you cannot walk
+    // THROUGH the manor - only into the doorway portal.
+    const footprintW = 130;
+    const footprintH = 50;
+    const doorW = 26;
+    const leftW = (footprintW - doorW) / 2;
+    this.addWallRect(houseX - footprintW / 2, houseY - footprintH, houseX - doorW / 2, houseY - 6);
+    this.addWallRect(houseX + doorW / 2, houseY - footprintH, houseX + footprintW / 2, houseY - 6);
+
+    // Doorway portal - drawn ABOVE the manor's own art so the black hole
+    // reads unambiguously.
+    this.paintDoorwayPortal(houseX, houseY - 4, 22, 30);
+
+    // Warp zone in the doorway.
+    const zone = this.add.zone(houseX, houseY - 8, 22, 12);
+    this.physics.add.existing(zone, true);
+    zone.warpKind = 'arena';
+    this.warpZones.push(zone);
+
+    // "Arena" sign above the door.
+    this.add
+      .text(houseX, houseY - footprintH - 6, 'ARENA', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '14px',
+        color: '#f5cf4a',
+        stroke: '#000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(houseY + 2);
+  }
+
+  // Discovery: three rock circles hiding a bonus chest each, tucked in
+  // corners the player has to actively explore to reach. Also spreads a
+  // few solitary cottages / mine entrances at the far edges of the field.
+  buildDiscoveryPockets() {
+    // Corners relative to the field origin (avoid castle + main path).
+    const pockets = [
+      { x: FX(FIELD_W - 3 * T), y: FY(FIELD_H - 3 * T), loot: 'grail' },
+      { x: FX(3 * T),           y: FY(FIELD_H - 6 * T), loot: 'warhammer' },
+      { x: FX(FIELD_W - 4 * T), y: FY(14 * T),          loot: 'armor_leather' },
+    ];
+    pockets.forEach(({ x, y, loot }) => {
+      // Ring of 6-8 rocks around the chest.
+      const rockCount = 7;
+      const ringRadius = 42;
+      for (let i = 0; i < rockCount; i++) {
+        const a = (i / rockCount) * Math.PI * 2 + Math.random() * 0.4;
+        // Leave a small opening on one side so it's approachable.
+        if (Math.abs(a - Math.PI / 2) < 0.6) continue;
+        const rx = x + Math.cos(a) * ringRadius + Phaser.Math.Between(-4, 4);
+        const ry = y + Math.sin(a) * ringRadius + Phaser.Math.Between(-4, 4);
+        this.spawnCollidableRock(rx, ry);
+      }
+      const chest = spawnChest(this, loot, x, y);
+      chest.isDiscoveryChest = true;
+      if (this.pickups) this.pickups.add(chest); // pickups group may not exist yet
+      else {
+        this._pendingDiscoveryChests = this._pendingDiscoveryChests || [];
+        this._pendingDiscoveryChests.push(chest);
+      }
+    });
+  }
+
+  // Places a rock sprite AND its physical collision rectangle. Used both
+  // by decoration scatter and by discovery pockets so no rock can be
+  // walked through anymore.
+  spawnCollidableRock(x, y) {
+    const key = this.cfg.groundTile === 'tile_stone' ? 'rock' : 'rock';
+    const img = this.add.image(x, y, key).setOrigin(0.5, 0.9).setDepth(y - 1);
+    // Rock hitbox: an ellipse-ish rect at the base of the sprite.
+    const rect = this.add.rectangle(x, y - 6, 24, 14, 0, 0);
+    this.physics.add.existing(rect, true);
+    this.walls.add(rect);
+    this.houses.push(img);
+    return img;
   }
 
   // Wooden dock jutting into the beach ring where the boat parks. Purely
@@ -573,9 +709,23 @@ export default class IslandScene extends Phaser.Scene {
         const key = Phaser.Utils.Array.GetRandom(weighted);
         const worldX = FX(localX);
         const worldY = FY(localY);
+        if (key === 'rock') {
+          // Rocks now have real collision so the player cannot walk under
+          // them anymore. spawnCollidableRock handles sprite + hitbox.
+          this.spawnCollidableRock(worldX, worldY);
+          continue;
+        }
         const img = this.add.image(worldX, worldY, key);
         if (key === 'flowers') {
           img.setOrigin(0.5, 0.6).setDepth(2);
+        } else if (key === 'tree' || key === 'pine_tree') {
+          img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
+          // Trees also collide - tighter trunk hitbox at the base.
+          const rect = this.add.rectangle(worldX, worldY - 6, 18, 12, 0, 0);
+          this.physics.add.existing(rect, true);
+          this.walls.add(rect);
+        } else if (key === 'bush') {
+          img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
         } else {
           img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
         }

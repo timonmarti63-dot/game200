@@ -254,7 +254,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.events.emit('playerAttack', {
       x: this.x + this.facing.x * 18,
       y: this.y + this.facing.y * 18,
-      angle,
+      angle: baseAngle,
       range: weapon.range,
       damage: grailActive ? weapon.damage * 2 : weapon.damage,
     });

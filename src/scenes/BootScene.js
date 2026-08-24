@@ -78,6 +78,16 @@ const SPRITES = [
   'armor_plate',
   'house_cottage_a',
   'house_cottage_b',
+  // Pokemon-style interior furniture
+  'furn_bed',
+  'furn_table_round',
+  'furn_bookshelf',
+  'furn_plant_pot',
+  'furn_crate',
+  'furn_kitchen',
+  'furn_painting',
+  'furn_armchair',
+  'furn_rug',
 ];
 
 export default class BootScene extends Phaser.Scene {
