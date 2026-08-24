@@ -4,6 +4,7 @@ import { ITEMS } from '../systems/Items.js';
 import Inventory from '../systems/Inventory.js';
 import { Sfx } from '../systems/Sfx.js';
 import { savePlayerState, loadPlayerState, applyPlayerState } from '../systems/PlayerState.js';
+import { resetKeysOnBlur } from '../systems/InputSafety.js';
 
 const SPEED = 118;
 const GRAIL_SPEED = 210;
@@ -75,6 +76,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       hot3: Phaser.Input.Keyboard.KeyCodes.THREE,
       hot4: Phaser.Input.Keyboard.KeyCodes.FOUR,
     });
+    resetKeysOnBlur(this.keys, this);
   }
 
   isInvulnerable(time) {

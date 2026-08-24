@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { resetKeysOnBlur } from '../systems/InputSafety.js';
 
 const ISLANDS = [
   { key: 'rubenfeld', name: 'Rübenfeld', art: 'island_rubenfeld', x: 700, y: 420, scale: 0.95 },
@@ -72,6 +73,7 @@ export default class SailingScene extends Phaser.Scene {
       left2: 'LEFT',
       right2: 'RIGHT',
     });
+    resetKeysOnBlur(this.keys, this.events);
 
     this.nearIsland = null;
     this.input.keyboard.on('keydown-SPACE', () => this.tryInteract());
