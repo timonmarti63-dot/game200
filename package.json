@@ -1,7 +1,7 @@
 {
   "name": "game-100-",
   "version": "1.0.0",
-  "description": "Krone & Kettenhemd - humorvolles Top-Down Mittelalter-Action-Adventure",
+  "description": "Orden der Wildnis - rundenbasiertes Kreaturen-Abenteuer im Reich von Krone & Kettenhemd",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,10 +19,7 @@
     "url": "https://github.com/timonmarti63-dot/Game-100-/issues"
   },
   "homepage": "https://github.com/timonmarti63-dot/Game-100-#readme",
-  "dependencies": {
-    "@supabase/supabase-js": "^2.112.4",
-    "phaser": "^3.90.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "playwright": "^1.62.1",
     "vite": "^5.4.21"

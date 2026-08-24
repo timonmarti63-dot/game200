@@ -1,6 +1,6 @@
-# Krone & Kettenhemd
+# Orden der Wildnis
 
-Spielbarer Prototyp zum [Game Design Document](GDD.md) — ein 2D-Top-Down-Action-Adventure im humorvollen Mittelalter-Setting, gebaut mit [Phaser 3](https://phaser.io/) und Vite. Charaktere, Gegner, Items, das Boot und alle Bodentexturen sind handgezeichnete Pixel-Art (`public/sprites/`, generiert über `tools/generate_pixel_art.py`); nur ein paar kleine UI-Glyphen (Herzen, Ausrufezeichen, Icons) werden weiterhin zur Laufzeit prozedural gezeichnet (`src/assets.js`). Soundeffekte sind prozedural per Web Audio API synthetisiert (`src/systems/Sfx.js`) — keine externen Audio-Dateien nötig.
+Ein rundenbasiertes Kreaturen-Sammel-Abenteuer im Reich von *Krone & Kettenhemd* — inspiriert vom klassischen "Pokémon"-Aufbau (Zonen mit Fortschrittssperren, Erkunden mit Zufallsbegegnungen, typenbasierte Rundenkämpfe, Fangmechanik), aber mit eigenem Kreaturen-Roster, eigenem Typensystem und mittelalterlichem Anstrich. Gebaut mit reinem Vanilla-JS/HTML/CSS und Vite — kein Canvas-Framework nötig, da das Spiel komplett menügetrieben ist. Alle Sprites sind handgezeichnete Pixel-Art (`public/sprites/`, generiert über `tools/generate_pixel_art.py` und `tools/generate_creatures.py`); Soundeffekte sind prozedural per Web Audio API synthetisiert (`src/systems/Sfx.js`) — keine externen Audio-Dateien nötig.
 
 ## Spielen
 
@@ -11,57 +11,42 @@ npm run dev
 
 Dann im Browser die angezeigte URL öffnen (Standard: http://localhost:5173).
 
-## Umfang dieses Prototyps
+## Spielprinzip
 
-- **Tutorial:** Beim ersten Start erklärt eine kurze Seiten-Sequenz Story, Segeln, Erkunden, Kampf und Ausrüstung (überspringbar mit Esc, jederzeit über [T] im Titelbildschirm erneut ansehbar).
-- **Titel & Segeln:** Boot auf offener See steuern (zeigt immer nach Norden), zur Insel Rübenfeld segeln. Eisenklamm schaltet sich nach der Eroberung Rübenfelds frei; Möwenhort ist als eigene, unterschiedlich gestaltete Insel sichtbar, aber noch als "nicht erreichbar" markiert (nächster Ausbauschritt).
-- **Insel Rübenfeld:** eine große, echte Insel mit Wasser/Strand-Ring um ein weitläufiges Grasland, verstreuten Bäumen/Büschen/Felsen/Blumen, einem kleinen Dorf (3 handgezeichnete Häuser) im Westen und einer Burg im Norden. Gegner: tollpatschige Hellebardiere, aggressive Wildgänse. Boss: Baron Rudibert.
-- **Insel Eisenklamm:** freigeschaltet nach Rübenfeld, gleiche Insel-Geometrie in düsterem Fels-/Minen-Look (eigene Boden-/Wand-Texturen, Kiefern statt Bäume, Mineneingänge statt Dorf). Gegner: schwer gepanzerte Elite-Ritter (fast unbesiegbar von vorn durch ihren Turmschild, aber so langsam, dass man sie mühelos umrundet), schnelle Minen-Kobolde mit Spitzhacke, Sprengfallen-Ingenieure, die häufiger sich selbst als den Spieler erwischen. Boss: **Eisenherzog Grendal** — hält meist stand wie eine Wand, muss aber per Beleidigungs-Parieren zu einem hektischen Wutsprint provoziert werden, der ihn kurz darauf erschöpft und verwundbar zu Boden gehen lässt (Bonusschaden-Fenster).
-- **Kampfsystem:** Nahkampf mit austauschbaren Waffen, Ausweichrolle, Beleidigungs-Parieren (kontert telegraphierte Angriffe, Gegner flieht weinend), Wurfgeschosse (Huhn/Fass/Melone), sowie **Der Anstands-Enterhaken** — ein freischaltbarer Enterhaken (Fund auf Eisenklamm), der auf [F] Gegner im Zielkegel heranzieht (kurze Betäubung) oder Rüdiger nach vorn zieht, wenn kein Ziel in Reichweite ist.
-- **Ausrüstung & Inventar:** Waffen (Schwert, Kriegshammer), Rüstung (Lederrüstung, mehr Herzen), Tränke und der "Heilige Gral" als Hotbar-Trinket lassen sich auf den Inseln finden (am Boden, in Truhen, als Beute besiegter Gegner). Verbrauchsgegenstände (Tränke, Wurfgeschosse) stapeln sich jetzt in einem Slot (Mengenanzeige) statt je einen eigenen Platz zu belegen. Hotbar unten (Slots [1]-[4]); volles Inventar mit Rucksack/Ausrüstungs-Slots über [E] (pausiert das Spiel).
-- **Bewegungs-Feedback:** kein Frame-für-Frame-Lauf-Sprite, aber ein leichtes Stauch-/Streck-Bobbing synchron zur Bewegungsgeschwindigkeit lässt Spieler und Gegner beim Laufen "animiert" wirken.
-- **Sound:** kurze prozedural erzeugte Retro-Sounds für Angriff, Treffer, Ausweichen, erfolgreiches Kontern, Aufheben, Truhe öffnen, Wurf, Enterhaken, Gegner-/Boss-Tod, Toröffnung und Spieler-Schaden/-Tod.
+1. **Worldbuilding & Fortschritt:** Drei begehbare Zonen (Wiesenmark → Nebelwald → Eisenklamm), jede mit eigenem Wetter, eigener Fauna und einem Zonen-Boss ("Ordensmeister"). Der Weg zur nächsten Zone öffnet sich erst, wenn der aktuelle Ordensmeister besiegt wurde und seinen Orden überreicht hat. Eine vierte Zone (Möwenhort) ist als "kommt bald" sichtbar.
+2. **Erkundung:** Pro Zone gibt es einen kurzen Bereichs-Pfad. Aktionen: **Erkunden** (70 % Zufallsbegegnung, 20 % Fund, 10 % Lore-Text; ein unsichtbarer Gefahren-Zähler erzwingt bei 100 % garantiert eine Begegnung), **Rasten** (heilt leicht, 15 % Hinterhalt-Risiko), **Weiterziehen** (zum nächsten Bereich, am Ende zum Zonen-Boss) und **Team & Beutel**.
+3. **Kampf:** Rundenbasiert mit Initiative nach Tempo-Wert, vier gleichzeitig aktiven Attacken pro Kreatur, neun Elementtypen mit eigener Effektivitäts-Matrix (Feuer/Flut/Erde/Sturm/Wald/Stahl/Licht/Schatten/Normal), Statuseffekten (Gift, Paralyse, Verbrennung, Schlaf, Frost) und einer transparenten Fangchance-Berechnung beim Einsatz eines Bindesiegels.
 
 ## Steuerung
 
-| Aktion | Taste |
-|---|---|
-| Bewegen | WASD / Pfeiltasten |
-| Angriff | Leertaste / J |
-| Ausweichrolle | Shift / K |
-| Beleidigungs-Parieren | Q / L |
-| Anstands-Enterhaken (nach Fund) | F |
-| Hotbar-Slot benutzen | 1 / 2 / 3 / 4 |
-| Inventar öffnen/schließen | E (oder Esc im Inventar) |
+Vollständig maus-/touch-bedienbar über Buttons — keine Tastatursteuerung nötig.
 
-## Cloud-Speicher (optional, kostenlos, geräteübergreifend)
+## Kern-Formeln
 
-Standardmäßig läuft das Spiel komplett ohne Backend — Fortschritt bleibt nur für die aktuelle Browser-Sitzung erhalten. Optional lässt sich ein kostenloser [Supabase](https://supabase.com)-Account anbinden, damit Ausrüstung/Hotbar/Rucksack/eroberte Inseln mit einem Login geräteübergreifend gespeichert werden — ganz ohne eigenen Server-Code, da das Spiel direkt (über die öffentliche "anon"-Taste + Row-Level-Security) mit Supabase spricht.
+- **Statuswerte:** `Stat(Level) = floor(Basiswert * Level / 50) + 5` (KP: `+ Level + 10`), keine IVs/EVs — deterministisch aus Basiswert + Level.
+- **Schaden:** angelehnt an die klassische Formel, mit Typen-Multiplikator, STAB (1.5× bei typgleicher Attacke), 1/16-Volltreffer-Chance (1.5×) und einem Zufallsfaktor 0.85–1.0.
+- **Fangchance:** exakt `P = ((MaxKP·3 − AktKP·2) / (MaxKP·3)) · Ball-Bonus · Status-Bonus`, mit Status-Bonus 2.0 bei Schlaf/Frost, 1.5 bei Gift/Paralyse/Verbrennung.
+- **EP-Kurve:** `EP(Level) = Level³`; EP-Ertrag pro Sieg `floor(BasisEP · Gegner-Level / 7)`.
 
-**Einrichtung (ca. 3 Minuten):**
-1. Kostenloses Projekt auf [supabase.com](https://supabase.com) anlegen.
-2. Im Supabase-Dashboard unter *SQL Editor* den Inhalt von `supabase/schema.sql` einfügen und ausführen (legt die Tabelle + Zugriffsrechte an).
-3. Unter *Settings → API* die **Project URL** und den **anon public key** kopieren.
-4. Beides in `src/systems/CloudSave.js` eintragen (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
-5. Neu bauen/deployen (`npm run build`, bzw. bei Vercel reicht ein Push).
-
-Im Spiel dann über **[C]** auf dem Titelbildschirm oder auf See ein Konto registrieren/anmelden. Ohne Einrichtung zeigt der Cloud-Speicher-Dialog einfach "nicht eingerichtet" und das Spiel funktioniert wie zuvor lokal weiter.
-
-**Wichtig:** Der Cloud-Login funktioniert nur auf einer echten Deployment-URL (z. B. Vercel) — die Vorschau in einem geteilten Claude-Artifact blockiert aus Sicherheitsgründen Netzwerkzugriffe zu fremden Servern und zeigt daher immer "nicht eingerichtet", selbst mit echten Zugangsdaten im Code.
+Alle Formeln liegen zentral in `src/data/formulas.js`.
 
 ## Projektstruktur
 
-- `src/scenes/` – Boot, Title, Tutorial, Sailing, Island (jetzt konfigurationsgetrieben für mehrere Inseln), UI, Inventory
-- `src/entities/` – Player, Enemy-Basisklasse, Halberdier, Goose, Boss (Rudibert), EliteKnight, MineGoblin, Sapper, DukeGrendal, Pickup/Wurfgeschosse
-- `src/systems/Items.js` – Item-Definitionen (Waffen, Rüstung, Tränke, Wurfgeschosse, Trinkets, Fähigkeiten)
-- `src/systems/Inventory.js` – Inventar-Logik (Hotbar, Rucksack, Waffen-/Rüstungs-Slot, Item-Stapel)
-- `src/systems/Insults.js` – Beleidigungs- und Kampfansage-Texte
-- `src/systems/Sfx.js` – prozeduraler Web-Audio-Soundeffekt-Synthesizer
-- `src/systems/PlayerState.js` / `src/systems/CloudSave.js` – lokale Sitzungs-Persistenz bzw. optionale Supabase-Cloud-Speicherung
-- `src/assets.js` – prozeduraler Generator für kleine UI-Icons (Herzen, Ausrufezeichen, Nebel-VFX)
-- `public/sprites/` – handgezeichnete Pixel-Art-PNGs (Spieler, Gegner, Bosse, Items, Häuser, Deko, Boot, Tiles), von BootScene geladen
-- `tools/generate_pixel_art.py` – Python/Pillow-Skript, das `public/sprites/` erzeugt; `python3 tools/generate_pixel_art.py` zum Neu-Generieren/Anpassen (legt zusätzlich ein Kontaktabzug-Preview unter `tools/_preview/` an)
+- `src/data/` – Inhalte: Typen+Matrix (`types.js`), Formeln (`formulas.js`), Attacken (`moves.js`), Kreaturen-Roster (`creatures.js`), Zonen (`zones.js`), Ordensmeister (`trainers.js`), Items (`items.js`)
+- `src/engine/` – reine Spiellogik ohne UI: Kreaturen-Instanzen/Leveln/Entwicklung (`team.js`), Rundenkampf (`battle.js`), Erkundung/Gefahren-Zähler (`exploration.js`), Speicherstand (`gamestate.js`)
+- `src/ui/` – die komplette Oberfläche als state-machine-getriebene Vanilla-JS-App (`app.js`) plus Styling (`app.css`)
+- `src/systems/Sfx.js` – prozeduraler Web-Audio-Soundeffekt-Synthesizer (unverändert aus dem Vorgänger-Prototyp übernommen)
+- `public/sprites/creatures/`, `public/sprites/trainers/` – handgezeichnete Kreaturen-/Ordensmeister-Pixel-Art
+- `tools/generate_pixel_art.py` – Basis-Zeichenprimitive (Rechteck/Ellipse/Polygon/Schattierung/Outline) plus Alt-Assets (Eisenklamm-Grendal-Sprite wird als `trainer_grendal` weiterverwendet)
+- `tools/generate_creatures.py` – erzeugt den kompletten Kreaturen-/Ordensmeister-Roster; `python3 tools/generate_creatures.py` zum Neu-Generieren (Kontaktabzug unter `tools/_preview/creatures_sheet.png`)
+
+## Umfang von v1
+
+- 3 Starter-Linien (je 3 Entwicklungsstufen): Wurzling→Dornwicht→Eichenwart (Wald), Flackling→Glutgeist→Feuerdrake (Feuer), Tropfling→Flussgeist→Sturmwal (Flut)
+- 6 wilde Arten (2 pro Zone) + 3 einzigartige Ordensmeister-Kreaturen
+- 3 begehbare Zonen mit je einem Ordensmeister-Kampf; eine vierte Zone als Ausblick
+- Team-Kappe 6, unbegrenzte Kiste für überzählige gefangene Kreaturen
 
 ## Nächste Schritte
 
-Möwenhort ist bisher nur als Insel-Grafik auf der Seekarte vorhanden, aber nicht begehbar (dritte Insel + Piraten-Boss stehen noch aus). Echte Lauf-Animationen (mehrere Sprite-Frames statt Bewegungs-Bobbing), Musik, sowie die übrigen GDD-Power-Ups (Bannerbuch, Selbstschussarmbrust, Glücksbringer-Hühnerfuß) sind noch nicht implementiert.
+Möwenhort als vierte begehbare Zone mit eigenem Roster und Ordensmeister, weitere Entwicklungslinien/wilde Arten, Attacken-Ersetzen bei mehr als 4 gelernten Attacken (aktuell werden automatisch die vier neuesten aktiv gehalten), sowie ein optionaler Cloud-Speicher-Anschluss (z. B. erneut über Supabase, analog zum Vorgänger-Prototyp) für geräteübergreifenden Fortschritt.
