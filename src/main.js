@@ -9,6 +9,7 @@ import InteriorScene from './scenes/InteriorScene.js';
 import ShopScene from './scenes/ShopScene.js';
 import UIScene from './scenes/UIScene.js';
 import InventoryScene from './scenes/InventoryScene.js';
+import CrewScene from './scenes/CrewScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -42,6 +43,7 @@ const config = {
     ShopScene,
     UIScene,
     InventoryScene,
+    CrewScene,
   ],
 };
 

@@ -89,6 +89,16 @@ const SPRITES = [
   'furn_painting',
   'furn_armchair',
   'furn_rug',
+  // HD-2D Crew-Battler-Portraits (Master-Skript-Klassennamen 1:1)
+  'Crew_01_Gras_Brawler',
+  'Crew_02_Wald_Rogue',
+  'Crew_03_Berg_Tank',
+  'Crew_04_Canyon_Sniper',
+  'Crew_05_Hoehle_Defender',
+  'Crew_06_Vulkan_Berserk',
+  'Crew_07_Sumpf_Healer',
+  'Crew_08_Ruine_Mage',
+  'Crew_09_Klippe_Specialist',
 ];
 
 export default class BootScene extends Phaser.Scene {

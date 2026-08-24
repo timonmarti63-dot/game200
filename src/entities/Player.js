@@ -193,6 +193,23 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   //   flüssiges Laufen ohne Micro-Stops.
   // - Ist die Zielzelle blockiert, dreht sich der Player nur (facing) und
   //   bleibt stehen. Genau wie in klassischen Pokemon-Spielen.
+  // Input-Buffer: hält die zuletzt gewollte Richtung, damit ein Wechsel
+  // mitten in einer Grid-Bewegung nicht verloren geht (klassisches
+  // Pokemon/Zelda-Feel am PC).
+  _readWantedDir() {
+    const k = this.keys;
+    const wantLeft = k.left.isDown || k.left2.isDown;
+    const wantRight = k.right.isDown || k.right2.isDown;
+    const wantUp = k.up.isDown || k.up2.isDown;
+    const wantDown = k.down.isDown || k.down2.isDown;
+    // Prio: horizontal vor vertikal (verhindert Diagonal-Stottern).
+    if (wantLeft) return { dcol: -1, drow: 0 };
+    if (wantRight) return { dcol: 1, drow: 0 };
+    if (wantUp) return { dcol: 0, drow: -1 };
+    if (wantDown) return { dcol: 0, drow: 1 };
+    return { dcol: 0, drow: 0 };
+  }
+
   handleMovement(time) {
     if (this.dodging || this.grappling) return;
     const scene = this.scene;
@@ -203,13 +220,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    const k = this.keys;
-    // Prioritäts-Reihenfolge: die ZULETZT gedrückte Richtung gewinnt.
-    // Das ist die klassische Pokemon-Regel und verhindert Diagonal-Stotter.
-    const wantLeft = k.left.isDown || k.left2.isDown;
-    const wantRight = k.right.isDown || k.right2.isDown;
-    const wantUp = k.up.isDown || k.up2.isDown;
-    const wantDown = k.down.isDown || k.down2.isDown;
+    // Input JEDES Frame lesen (auch während Bewegung) - so kann der
+    // Buffer im nächsten Snap sofort weiterlaufen.
+    const wanted = this._readWantedDir();
 
     // Wenn wir gerade zwischen zwei Zellen sind: weiterinterpolieren.
     if (this._moving) {
@@ -218,6 +231,17 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       const dist2 = dx * dx + dy * dy;
       const grailActive = time < this.grailActiveUntil;
       const speed = grailActive ? GRAIL_SPEED : SPEED;
+
+      // Input-Buffer: Nur wenn Player kurz vor Zellenmitte ist (< ~30% Rest)
+      // wird die nächste Bewegung schon vorbereitet. Puffert die Eingabe
+      // so, dass Halten der Taste = kontinuierliches Laufen ohne Pause.
+      if (dist2 < 100 && wanted.dcol === 0 && wanted.drow === 0) {
+        // Keine Eingabe mehr - beim nächsten Snap wird gestoppt.
+        this._bufferedDir = null;
+      } else if (dist2 < 100 && (wanted.dcol !== 0 || wanted.drow !== 0)) {
+        this._bufferedDir = wanted;
+      }
+
       if (dist2 < 4) {
         // Angekommen - snap auf Zelle.
         this.setPosition(this._targetX, this._targetY);
@@ -238,14 +262,27 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (this._moving) return;
 
-    // Nicht in Bewegung: neue Richtung wählen (falls Taste gedrückt).
+    // Nicht in Bewegung: gepufferte Richtung hat Vorrang, dann live-Eingabe.
     let dcol = 0;
     let drow = 0;
-    // Reihenfolge: horizontale Präferenz wenn beide gedrückt.
-    if (wantLeft) { dcol = -1; drow = 0; }
-    else if (wantRight) { dcol = 1; drow = 0; }
-    else if (wantUp) { dcol = 0; drow = -1; }
-    else if (wantDown) { dcol = 0; drow = 1; }
+    if (this._bufferedDir && (this._bufferedDir.dcol !== 0 || this._bufferedDir.drow !== 0)) {
+      // Nur benutzen wenn Taste noch gedrückt oder frisch gepuffert.
+      const buf = this._bufferedDir;
+      // Prüfen: ist die Taste NOCH gedrückt? Wenn ja, weiter.
+      const stillDown = (buf.dcol === -1 && (this.keys.left.isDown || this.keys.left2.isDown))
+                     || (buf.dcol === 1 && (this.keys.right.isDown || this.keys.right2.isDown))
+                     || (buf.drow === -1 && (this.keys.up.isDown || this.keys.up2.isDown))
+                     || (buf.drow === 1 && (this.keys.down.isDown || this.keys.down2.isDown));
+      if (stillDown) {
+        dcol = buf.dcol;
+        drow = buf.drow;
+      }
+      this._bufferedDir = null;
+    }
+    if (dcol === 0 && drow === 0) {
+      dcol = wanted.dcol;
+      drow = wanted.drow;
+    }
 
     if (dcol === 0 && drow === 0) {
       this.setVelocity(0, 0);

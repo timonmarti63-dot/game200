@@ -201,6 +201,13 @@ export default class IslandScene extends Phaser.Scene {
     const cfg = this.cfg;
     ensureCurrency(this.registry);
 
+    // Master-Skript Hotkey: [C] öffnet die Crew-Übersicht.
+    this.input.keyboard.on('keydown-C', () => {
+      if (this.scene.isActive('Crew')) return;
+      this.scene.pause();
+      this.scene.launch('Crew');
+    });
+
     // Walkable-Grid für Pokemon-Style-Bewegung. Cover full outdoor incl.
     // water ring so world edges block naturally. Alle wall-Zellen werden
     // über addWallRect / markGridWall automatisch gesetzt.
