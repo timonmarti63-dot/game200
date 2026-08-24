@@ -454,15 +454,18 @@ export default class IslandScene extends Phaser.Scene {
     // Tile-Rechteck (footCols x footRows). Anker (col,row) ist die
     // Tür-Kachel des Hauses (unten mittig). Der Sprite wird darauf so
     // positioniert dass die Tür der Grafik genau auf diese Kachel fällt.
+    // Pokemon-Regel: kein Haus ohne Zweck. Cottages/Bauernhof/Wirtshaus
+    // haben interiorKind + label - beim Betreten öffnet ein Talker-Room
+    // mit Gerüchten über Kaiser, Nachbarinseln und versteckte Schätze.
     const houses = [
       { key: 'house_apothecary', col: 8,  row: 10, footCols: 4, footRows: 3, scale: 3.0, shop: 'apothecary', label: 'Apotheke' },
       { key: 'house_smith',      col: 17, row: 10, footCols: 4, footRows: 3, scale: 3.0, shop: 'smith',      label: 'Schmiede' },
-      { key: 'house_cottage_a',  col: 5,  row: 20, footCols: 3, footRows: 3, scale: 2.6 },
-      { key: 'house_cottage_b',  col: 11, row: 24, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_cottage_a',  col: 5,  row: 20, footCols: 3, footRows: 3, scale: 2.6, interiorKind: 'cottage', label: 'Häuschen' },
+      { key: 'house_cottage_b',  col: 11, row: 24, footCols: 3, footRows: 3, scale: 2.6, interiorKind: 'farm',    label: 'Bauernhof' },
       { key: 'house_cottage_a',  col: 17, row: 20, footCols: 3, footRows: 3, scale: 2.6 },
       { key: 'house_cottage_b',  col: 20, row: 24, footCols: 3, footRows: 3, scale: 2.6 },
       { key: 'house_stone',      col: 4,  row: 30, footCols: 3, footRows: 3, scale: 2.6 },
-      { key: 'house_inn',        col: 18, row: 32, footCols: 4, footRows: 3, scale: 3.0 },
+      { key: 'house_inn',        col: 18, row: 32, footCols: 4, footRows: 3, scale: 3.0, interiorKind: 'tavern', label: 'Wirtshaus' },
     ];
 
     // Curved paths connecting well to key destinations.
@@ -487,7 +490,7 @@ export default class IslandScene extends Phaser.Scene {
     const vColBase = Math.floor(OFFSET / T);
     const vRowBase = Math.floor(OFFSET / T);
 
-    houses.forEach(({ key, col, row, footCols, footRows, scale = 2.6, shop, label }) => {
+    houses.forEach(({ key, col, row, footCols, footRows, scale = 2.6, shop, interiorKind, label }) => {
       const absCol = vColBase + col;
       const absRow = vRowBase + row;
       // Weltkoords der Türkachel (unten-mittig des Haus-Fussabdrucks).
@@ -512,7 +515,9 @@ export default class IslandScene extends Phaser.Scene {
       img.setDepth(doorWorld.y + T / 2 - 1);
       this.houses.push(img);
 
-      if (shop) {
+      // Talker- oder Shop-Häuser bekommen Türportal + Warp.
+      const hasInterior = !!shop || !!interiorKind;
+      if (hasInterior) {
         // Schwarzes Türrechteck IN die gemalte Tür des Haus-Sprites setzen.
         // Bei den grossen Häuser-Sprites (scale ~2.6) sitzt die Tür ca.
         // 10-14% über der Sprite-Unterkante, nicht ganz unten. Wir nehmen
@@ -524,19 +529,18 @@ export default class IslandScene extends Phaser.Scene {
         const portalW = T * 0.7;
         const portalH = T * 0.85;
         this.paintDoorwayPortalOnHouse(portalX, portalY, portalW, portalH, spriteBottomY);
-        // Warp-Event auf Türkachel registrieren.
-        this.walkableGrid.addWarp(absCol, absRow, {
-          kind: 'shop',
-          shopKind: shop,
-          returnX: doorWorld.x,
-          returnY: doorWorld.y + T, // Player kommt eine Kachel unterhalb raus
-        });
+        // Warp-Event auf Türkachel registrieren: shop öffnet ShopScene,
+        // interior öffnet Talker-Innenraum (kein Kaufen).
+        const warpPayload = shop
+          ? { kind: 'shop', shopKind: shop, returnX: doorWorld.x, returnY: doorWorld.y + T }
+          : { kind: 'interior', interiorKind, returnX: doorWorld.x, returnY: doorWorld.y + T };
+        this.walkableGrid.addWarp(absCol, absRow, warpPayload);
 
         // Sign eine Kachel unter der Tür, damit er sichtbar bleibt.
         const x = doorWorld.x;
         const y = doorWorld.y + T + 2;
         this.add
-          .text(x, y + 22, label, {
+          .text(x, y + 22, label ?? '', {
             fontFamily: 'Georgia, serif',
             fontSize: '10px',
             color: '#f5cf4a',
@@ -600,6 +604,16 @@ export default class IslandScene extends Phaser.Scene {
         this.scene.stop('UI');
         this.scene.start('Interior', {
           kind: zone.shopKind,
+          returnScene: 'Island',
+          returnX: zone.returnX,
+          returnY: zone.returnY,
+          islandKey: this.islandKey,
+        });
+      } else if (zone.warpKind === 'interior') {
+        // Talker-Haus (Cottage/Tavern/Farm): kein Shop, aber Gerücht-NPC.
+        this.scene.stop('UI');
+        this.scene.start('Interior', {
+          kind: zone.interiorKind,
           returnScene: 'Island',
           returnX: zone.returnX,
           returnY: zone.returnY,

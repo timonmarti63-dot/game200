@@ -7,9 +7,11 @@ const T = 32;
 const ROOM_W = 15 * T; // 480
 const ROOM_H = 10 * T; // 320
 
-// A single Pokemon-style interior template. The shop kind decides which
-// shopkeeper stands behind the counter, which title reads on the sign,
-// and which stock the ShopScene shows when we open it.
+// Pokemon-Style Innenraum-Templates.
+// - shop-Typen (apothecary/smith): Verkäufer hinter Theke, [E] öffnet Shop.
+// - talker-Typen (cottage/tavern/farm/scholar/guard): kein Shop, sondern
+//   ein NPC mit einem Gerücht (Kaiser-Klatsch, versteckter Schatz-Tipp)
+//   oder einer kleinen Belohnung. "Jedes Haus lohnt sich" - Pokemon-Regel.
 const INTERIOR_CONFIG = {
   apothecary: {
     displayName: 'Apotheke der Alchemistin Ilse',
@@ -18,6 +20,7 @@ const INTERIOR_CONFIG = {
     counterColor: 0x6f4a25,
     wallColor: 0x8f5c33,
     shopKind: 'apothecary',
+    kind: 'shop',
     greeting: '"Willkommen! Ein Fläschchen Mut gefällig?"',
   },
   smith: {
@@ -27,7 +30,54 @@ const INTERIOR_CONFIG = {
     counterColor: 0x4a4a4a,
     wallColor: 0x5c5148,
     shopKind: 'smith',
+    kind: 'shop',
     greeting: '"Härtestes Eisen, faireste Preise. Was darf\'s sein?"',
+  },
+  cottage: {
+    displayName: 'Häuschen der alten Grete',
+    sign: 'Häuschen',
+    shopkeeper: 'shopkeeper_potion',
+    counterColor: 0x6a4a2e,
+    wallColor: 0x8a6a44,
+    kind: 'talker',
+    greeting: '"Setz dich, Ritter. Ich hab was gehört..."',
+    // Rotierende Gerüchte - jeder Besuch würfelt eins.
+    rumors: [
+      '"Der Kaiser? Der ist ein müder Mann. Wer die drei Adelsränge sammelt,\ndarf ihn im Kaisersaal fordern."',
+      '"Auf Eisenklamm sperrt ein Wachposten den Weg zur Mine. Er lässt nur\ngeprüfte Ritter passieren - sag ihm dein Wappen."',
+      '"Es heisst, unter den Rübenfeldern liegt eine Truhe. Ein Bauer sah\netwas glänzen, wo die drei Bäume sich im Kreis neigen."',
+    ],
+    reward: null,
+  },
+  tavern: {
+    displayName: 'Zum Krummen Anker - Wirtshaus',
+    sign: 'Wirtshaus',
+    shopkeeper: 'shopkeeper_smith',
+    counterColor: 0x5a3a20,
+    wallColor: 0x704a2a,
+    kind: 'talker',
+    greeting: '"Erster Krug geht aufs Haus, Ritter. Klatsch gibts gratis dazu."',
+    rumors: [
+      '"Der Kaiser hat drei Söhne und keinen davon zum Nachfolger gemacht.\nDer Thron wartet auf jemanden mit Rückgrat."',
+      '"Ein Kapitän im Hafen sucht einen Ritter mit hohem Rang - er kennt\neine Insel, die keine Karte zeigt."',
+      '"Die Wachen am Torhaus lachen nur über niedrige Ränge. Werd erst zum\nBaron, dann öffnen sie das Tor."',
+    ],
+    reward: null,
+  },
+  farm: {
+    displayName: 'Hof des Bauern Klaus',
+    sign: 'Bauernhof',
+    shopkeeper: 'chicken',
+    counterColor: 0x4a3a20,
+    wallColor: 0x6a4a2a,
+    kind: 'talker',
+    greeting: '"Willkommen! Vorsicht mit dem Huhn - das beisst."',
+    rumors: [
+      '"Wirf ein Huhn auf einen Feind und der zuckt zusammen wie vom Blitz.\nAlter Ritter-Trick, glaub mir."',
+      '"Meine Rüben wachsen dieses Jahr grösser als sonst. Vielleicht hilft\ndir eine gegen den Hunger auf Reisen."',
+    ],
+    // Bauer gibt beim ersten Besuch eine Rübe.
+    reward: { item: 'veggie', qty: 1, oneShot: true, msg: 'Klaus drückt dir eine dicke Rübe in die Hand.' },
   },
 };
 
@@ -50,6 +100,7 @@ export default class InteriorScene extends Phaser.Scene {
   create() {
     const cfg = INTERIOR_CONFIG[this.interiorKind] ?? INTERIOR_CONFIG.apothecary;
     this.cfg = cfg;
+    this.isShop = cfg.kind === 'shop';
 
     this.cameras.main.setBackgroundColor('#1b1210');
     this.physics.world.setBounds(0, 0, ROOM_W, ROOM_H);
@@ -191,8 +242,11 @@ export default class InteriorScene extends Phaser.Scene {
     this.exitZone = this.add.zone(doorX, doorY, 40, 28);
     this.physics.add.existing(this.exitZone, true);
 
-    // Interact zone on the counter - overlapping and pressing E opens the shop.
-    this.interactZone = this.add.zone(ROOM_W / 2, counterY + 6, ROOM_W - 140, 40);
+    // Interact zone: bei Shops nur direkt am Tresen, bei Talker-Räumen
+    // wesentlich grösser damit man den NPC immer erwischt.
+    const izH = this.isShop ? 40 : 130;
+    const izY = this.isShop ? counterY + 6 : counterY + 40;
+    this.interactZone = this.add.zone(ROOM_W / 2, izY, ROOM_W - 140, izH);
     this.physics.add.existing(this.interactZone, true);
 
     // Spawn the player just below the counter (Grid-Mitte) so they don't
@@ -207,26 +261,52 @@ export default class InteriorScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.exitZone, () => this.returnToIsland());
 
     // E to interact - only fires if the player stands in the counter zone.
-    // Guarded by a small cooldown so re-entering the shop doesn't spam it.
+    // Guarded by a small cooldown so re-entering doesn't spam it.
     this.interactCooldownUntil = 0;
+    this.rumorTextObj = null;
     this.input.keyboard.on('keydown-E', () => {
       if (this.time.now < this.interactCooldownUntil) return;
       if (this.scene.isActive('Shop')) return;
       if (!this.physics.overlap(this.player, this.interactZone)) return;
       this.interactCooldownUntil = this.time.now + 400;
-      this.scene.launch('Shop', {
-        kind: cfg.shopKind,
-        title: cfg.displayName,
-      });
-      this.scene.pause();
+      if (this.isShop) {
+        this.scene.launch('Shop', {
+          kind: cfg.shopKind,
+          title: cfg.displayName,
+        });
+        this.scene.pause();
+      } else {
+        this.showRumor();
+      }
     });
 
     // Inventar-Toggle auch in den Läden. Player emittiert das Event
     // beim Drücken von I; hier hängen wir den Handler ein.
     this.events.on('toggleInventory', this.openInventory, this);
 
-    // Reveal the hint bar.
-    this.events.emit('hint', '[E] Kaufen   [I] Inventar   [\u2193] Ausgang');
+    // Reveal the hint bar - andere Aktion je nach Innenraumtyp.
+    const eLabel = this.isShop ? 'Kaufen' : 'Sprechen';
+    this.events.emit('hint', `[E] ${eLabel}   [I] Inventar   [\u2193] Ausgang`);
+
+    // Talker-Innenräume: einmalige Belohnung beim ersten Besuch.
+    if (!this.isShop && cfg.reward && !cfg.reward._given) {
+      const key = `visited_${this.interiorKind}`;
+      const already = this.registry.get(key);
+      if (!already && cfg.reward.oneShot) {
+        this.time.delayedCall(400, () => {
+          try {
+            const inv = this.registry.get('inventory') ?? [];
+            const existing = inv.find(e => e.id === cfg.reward.item);
+            if (existing) existing.qty += cfg.reward.qty;
+            else inv.push({ id: cfg.reward.item, qty: cfg.reward.qty });
+            this.registry.set('inventory', inv);
+            this.registry.events.emit('inventoryChanged');
+            this.events.emit('toast', cfg.reward.msg);
+            this.registry.set(key, true);
+          } catch (e) {}
+        });
+      }
+    }
 
     // The UIScene needs to know which scene events to listen to; interior
     // shops share the same UI HUD.
@@ -235,6 +315,43 @@ export default class InteriorScene extends Phaser.Scene {
 
     // Greeting is already rendered as a fixed label above the counter -
     // no need to also toast it, which used to double-print.
+  }
+
+  showRumor() {
+    // Zeigt ein zufälliges Gerücht als grosse Sprechblase, mit Space/E
+    // zum Schliessen. Klassisch Pokemon-Dialog-Feel.
+    if (this.rumorTextObj) return;
+    const cfg = this.cfg;
+    const rumors = cfg.rumors ?? [cfg.greeting];
+    const text = rumors[Math.floor(Math.random() * rumors.length)];
+    const boxY = ROOM_H - 90;
+    const bg = this.add.rectangle(ROOM_W / 2, boxY, ROOM_W - 60, 90, 0x1a1008, 0.94)
+      .setStrokeStyle(3, 0xc9a24a).setDepth(20);
+    const t = this.add.text(ROOM_W / 2, boxY - 6, text, {
+      fontFamily: 'Georgia, serif',
+      fontSize: '11px',
+      color: '#f2e6c8',
+      align: 'center',
+      wordWrap: { width: ROOM_W - 90 },
+    }).setOrigin(0.5).setDepth(21);
+    const hint = this.add.text(ROOM_W / 2, boxY + 32, '[E] weiter', {
+      fontFamily: 'Courier New', fontSize: '9px', color: '#c9a24a',
+    }).setOrigin(0.5).setDepth(21);
+    this.rumorTextObj = { bg, t, hint };
+    const close = () => {
+      if (!this.rumorTextObj) return;
+      this.rumorTextObj.bg.destroy();
+      this.rumorTextObj.t.destroy();
+      this.rumorTextObj.hint.destroy();
+      this.rumorTextObj = null;
+      this.input.keyboard.off('keydown-E', close);
+      this.input.keyboard.off('keydown-SPACE', close);
+    };
+    // Delay so the same E press that opened it doesn't close it.
+    this.time.delayedCall(150, () => {
+      this.input.keyboard.on('keydown-E', close);
+      this.input.keyboard.on('keydown-SPACE', close);
+    });
   }
 
   openInventory() {
