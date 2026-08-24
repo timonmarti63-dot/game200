@@ -1,0 +1,18 @@
+{
+  "name": "game200",
+  "version": "0.1.0",
+  "description": "Grid-based Pirate RPG - PC-first (keyboard/mouse), Pokemon-style overworld + turn-based combat foundation",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1",
+    "vite": "^5.4.21"
+  }
+}
