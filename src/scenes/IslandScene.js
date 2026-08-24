@@ -890,7 +890,8 @@ export default class IslandScene extends Phaser.Scene {
       const y = Phaser.Math.Between(OFFSET, OFFSET + GRASS_H - T);
       if (this.isDecorationExcluded(x - OFFSET - VILLAGE_W, y - OFFSET)) continue;
       const key = Phaser.Utils.Array.GetRandom(variants);
-      this.add.image(x, y, key).setDepth(0.2);
+      // Dezent einblenden - reine Farb-Variation, keine sichtbaren Patches.
+      this.add.image(x, y, key).setDepth(0.2).setAlpha(0.55);
     }
 
     // Sand variants around the beach ring
