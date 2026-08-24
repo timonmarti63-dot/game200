@@ -560,23 +560,27 @@ export default class IslandScene extends Phaser.Scene {
     this.paintDoorwayPortalOnHouse(x, y, width, height, y);
   }
 
-  // Paints the black doorway portal so it sits ON TOP of the house sprite
-  // (whose depth is anchored at anchorY-1). We render at anchorY + 0.1 so
-  // both the frame and inner black are visible over the wall texture.
+  // Marks a doorway on top of the house sprite: a subtle stone doorstep
+  // and a warm interior-light hint. Trusts the sprite's painted door and
+  // does NOT re-paint a black rectangle - it just tells the player
+  // "this is a real entrance, and it's warm inside".
   paintDoorwayPortalOnHouse(x, y, width, height, anchorY) {
     const d = anchorY + 0.1;
-    // Dark wooden frame (slightly larger than the black opening).
+    const cx = x;
+
+    // 1) Warm firelight hint inside the sprite's painted doorway. Small,
+    //    low-opacity so it looks like a lit torch behind the door.
     this.add
-      .rectangle(x, y - height / 2, width + 4, height + 3, 0x2a1a0e)
-      .setDepth(d);
-    // Black interior of the doorway.
+      .rectangle(cx, y - height * 0.25, Math.max(6, width - 10), Math.max(6, height * 0.5), 0x8a3a12, 0.28)
+      .setDepth(d + 0.02);
+
+    // 2) Two glowing lantern-dots flanking the door top - "enter here".
     this.add
-      .rectangle(x, y - height / 2, width, height, 0x000000)
-      .setDepth(d + 0.05);
-    // Subtle top gradient hint of receding depth.
+      .circle(cx - width / 2 + 1, y - height + 2, 1.4, 0xf5cf4a, 0.95)
+      .setDepth(d + 0.04);
     this.add
-      .rectangle(x, y - height + 2, Math.max(4, width - 6), 3, 0x0a1420, 0.75)
-      .setDepth(d + 0.1);
+      .circle(cx + width / 2 - 1, y - height + 2, 1.4, 0xf5cf4a, 0.95)
+      .setDepth(d + 0.04);
   }
 
   // Central warp dispatcher. Zones set their kind + payload; this decides
