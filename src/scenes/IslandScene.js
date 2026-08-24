@@ -801,15 +801,17 @@ export default class IslandScene extends Phaser.Scene {
   // the rock, so the player can walk past neighbouring rocks without
   // getting snagged.
   spawnCollidableRock(x, y) {
-    const img = this.add.image(x, y, 'rock').setOrigin(0.5, 0.9).setDepth(y - 1);
     // Rock hitbox als 1-Tile-Blocker: exakt die Zelle unter dem Fels ist
     // WALL, der Sprite hängt visuell drüber - klassisches Pokemon.
     const g = this.walkableGrid;
     if (g) {
       const cellPos = g.worldToCell(x, y);
-      // Nur die Kachel die der Sprite tatsächlich belegt sperren.
+      // Skip wenn Kachel schon belegt (unter Haus, Mauer, anderer Fels).
+      // Verhindert Ghost-Kacheln und doppelte Blocker.
+      if (g.get(cellPos.col, cellPos.row) !== 0) return null;
       g.set(cellPos.col, cellPos.row, CELL.WALL);
     }
+    const img = this.add.image(x, y, 'rock').setOrigin(0.5, 0.9).setDepth(y - 1);
     // Physics-Body für Kollisionen mit Feinden/Projektilen.
     const rect = this.add.rectangle(x, y - 4, 20, 14, 0, 0);
     this.physics.add.existing(rect, true);
@@ -852,6 +854,7 @@ export default class IslandScene extends Phaser.Scene {
   scatterDecorations() {
     const weighted = this.cfg.decorations;
     const cell = 96;
+    const g = this.walkableGrid;
     for (let gx = 0; gx < FIELD_W; gx += cell) {
       for (let gy = 0; gy < FIELD_H; gy += cell) {
         if (Math.random() > 0.5) continue;
@@ -862,6 +865,18 @@ export default class IslandScene extends Phaser.Scene {
         const key = Phaser.Utils.Array.GetRandom(weighted);
         const worldX = FX(localX);
         const worldY = FY(localY);
+
+        // Skip wenn die Zielkachel schon belegt ist (Haus, Steinmauer,
+        // anderer Blocker). Verhindert Ghost-Kacheln unter Sprites, die
+        // durch Depth-Sort verdeckt werden, und Deko in Häusern.
+        // Blocker-Deko (rock/tree/bush) skippen auch angrenzende Zellen
+        // damit Player nicht in Sackgassen läuft.
+        const isBlocker = key === 'rock' || key === 'tree' || key === 'pine_tree' || key === 'bush';
+        if (g && isBlocker) {
+          const cp = g.worldToCell(worldX, worldY);
+          if (g.get(cp.col, cp.row) !== 0) continue;
+        }
+
         if (key === 'rock') {
           // Rocks now have real collision so the player cannot walk under
           // them anymore. spawnCollidableRock handles sprite + hitbox.
@@ -875,7 +890,6 @@ export default class IslandScene extends Phaser.Scene {
           img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
           // Bäume als 1-Tile-Blocker im Grid (unter dem Stamm),
           // plus tighter physics-Body für Feinde/Projektile.
-          const g = this.walkableGrid;
           if (g) {
             const cp = g.worldToCell(worldX, worldY);
             g.set(cp.col, cp.row, CELL.WALL);
@@ -885,6 +899,14 @@ export default class IslandScene extends Phaser.Scene {
           this.walls.add(rect);
         } else if (key === 'bush') {
           img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
+          // Büsche sollen auch blocken - sind visuell klare Hindernisse.
+          if (g) {
+            const cp = g.worldToCell(worldX, worldY);
+            g.set(cp.col, cp.row, CELL.WALL);
+          }
+          const rect = this.add.rectangle(worldX, worldY - 2, 12, 8, 0, 0);
+          this.physics.add.existing(rect, true);
+          this.walls.add(rect);
         } else {
           img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
         }
