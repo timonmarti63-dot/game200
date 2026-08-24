@@ -12,6 +12,7 @@ import { ITEMS } from '../systems/Items.js';
 import { Sfx } from '../systems/Sfx.js';
 import { addSilver, addGold, ensureInitialised as ensureCurrency, getSilver } from '../systems/Currency.js';
 import { getDifficulty } from '../systems/Difficulty.js';
+import { WalkableGrid, CELL, GRID } from '../systems/Grid.js';
 
 const T = 32;
 
@@ -199,6 +200,26 @@ export default class IslandScene extends Phaser.Scene {
   create() {
     const cfg = this.cfg;
     ensureCurrency(this.registry);
+
+    // Walkable-Grid für Pokemon-Style-Bewegung. Cover full outdoor incl.
+    // water ring so world edges block naturally. Alle wall-Zellen werden
+    // über addWallRect / markGridWall automatisch gesetzt.
+    const cols = Math.ceil(OUTDOOR_W / T);
+    const rows = Math.ceil(OUTDOOR_H / T);
+    this.walkableGrid = new WalkableGrid(cols, rows, T);
+    // Wasserring & Rand als WALL markieren: alles außerhalb der
+    // physics-Bounds ist nicht begehbar.
+    const grassLeft = Math.floor((OFFSET - BEACH_MARGIN) / T);
+    const grassTop = Math.floor((OFFSET - BEACH_MARGIN) / T);
+    const grassRight = Math.ceil((OFFSET - BEACH_MARGIN + GRASS_W + BEACH_MARGIN * 2) / T);
+    const grassBottom = Math.ceil((OFFSET - BEACH_MARGIN + GRASS_H + BEACH_MARGIN * 2) / T);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (c < grassLeft || c >= grassRight || r < grassTop || r >= grassBottom) {
+          this.walkableGrid.set(c, r, CELL.WALL);
+        }
+      }
+    }
     // physics bounds are inset to the grass+beach (excludes the outer water
     // ring), so the player/enemies simply cannot walk out to sea - no water
     // collision geometry needed. Camera bounds cover the full map including
@@ -274,15 +295,16 @@ export default class IslandScene extends Phaser.Scene {
     // The arena exterior is a manor-style house sitting on the terrace,
     // with a black doorway portal (walk-through warp) at its base.
     this.buildArenaHouse();
-    // Discovery pockets: rock circles hiding chests, sparse cottages in
-    // the far corners of the field. Purely optional exploration.
-    this.buildDiscoveryPockets();
-
     // Player spawn now happens AFTER the world is built (so warp zones
     // exist and can be wired to overlaps). If we're returning from an
     // interior, use the door-return coordinates.
-    const startX = this.returningFromInterior && this.spawnX ? this.spawnX : PLAYER_START.x;
-    const startY = this.returningFromInterior && this.spawnY ? this.spawnY : PLAYER_START.y;
+    // Player-Startposition immer auf Grid-Mitte snappen.
+    const rawX = this.returningFromInterior && this.spawnX ? this.spawnX : PLAYER_START.x;
+    const rawY = this.returningFromInterior && this.spawnY ? this.spawnY : PLAYER_START.y;
+    const startCell = this.walkableGrid.worldToCell(rawX, rawY);
+    const snap = this.walkableGrid.cellToWorld(startCell.col, startCell.row);
+    const startX = snap.x;
+    const startY = snap.y;
     this.player = new Player(this, startX, startY);
     this.attachShadow(this.player, { scaleX: 1, alpha: 0.55 });
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -293,6 +315,9 @@ export default class IslandScene extends Phaser.Scene {
     this.spawnOutdoorEncounter();
     this.spawnOutdoorPickups();
     this.scatterDecorations();
+    // Discovery pockets need `this.pickups` to exist (chests join the
+    // pickup group), so we build them AFTER player + groups are ready.
+    this.buildDiscoveryPockets();
 
     this.physics.add.collider(this.player, this.walls);
     this.physics.add.collider(this.enemies, this.walls);
@@ -377,6 +402,22 @@ export default class IslandScene extends Phaser.Scene {
     const rect = this.add.rectangle((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, 0x000000, 0);
     this.physics.add.existing(rect, true);
     this.walls.add(rect);
+    // Zusätzlich das Grid markieren: alle Zellen, die die Wand berühren.
+    this.markGridWall(x0, y0, x1, y1);
+  }
+
+  // Markiert alle Zellen im walkableGrid, deren Zentrum in dem Rechteck
+  // liegt, als WALL. So sieht der Player die Wand aus Grid-Sicht.
+  markGridWall(x0, y0, x1, y1) {
+    const g = this.walkableGrid;
+    if (!g) return;
+    const c0 = Math.floor(x0 / g.cell);
+    const r0 = Math.floor(y0 / g.cell);
+    const c1 = Math.floor((x1 - 0.01) / g.cell);
+    const r1 = Math.floor((y1 - 0.01) / g.cell);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) g.set(c, r, CELL.WALL);
+    }
   }
 
   // Village: a proper cluster with two shops on the main street, cottages
@@ -409,16 +450,19 @@ export default class IslandScene extends Phaser.Scene {
       }
     };
 
-    // House layout - spread more widely across the bigger village strip.
+    // House layout auf Grid-Basis (Pokemon-Stil): jedes Haus deckt ein
+    // Tile-Rechteck (footCols x footRows). Anker (col,row) ist die
+    // Tür-Kachel des Hauses (unten mittig). Der Sprite wird darauf so
+    // positioniert dass die Tür der Grafik genau auf diese Kachel fällt.
     const houses = [
-      { key: 'house_apothecary', x: VX(220), y: FY(260), colW: 56, colH: 22, shop: 'apothecary', label: 'Apotheke' },
-      { key: 'house_smith',      x: VX(500), y: FY(260), colW: 60, colH: 24, shop: 'smith',      label: 'Schmiede' },
-      { key: 'house_cottage_a',  x: VX(130), y: FY(560), colW: 48, colH: 20 },
-      { key: 'house_cottage_b',  x: VX(270), y: FY(700), colW: 52, colH: 22 },
-      { key: 'house_cottage_a',  x: VX(470), y: FY(560), colW: 48, colH: 20 },
-      { key: 'house_cottage_b',  x: VX(600), y: FY(700), colW: 52, colH: 22 },
-      { key: 'house_stone',      x: VX(100), y: FY(920), colW: 40, colH: 18 },
-      { key: 'house_inn',        x: VX(520), y: FY(1000),colW: 60, colH: 24 },
+      { key: 'house_apothecary', col: 8,  row: 10, footCols: 4, footRows: 3, scale: 3.0, shop: 'apothecary', label: 'Apotheke' },
+      { key: 'house_smith',      col: 17, row: 10, footCols: 4, footRows: 3, scale: 3.0, shop: 'smith',      label: 'Schmiede' },
+      { key: 'house_cottage_a',  col: 5,  row: 20, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_cottage_b',  col: 11, row: 24, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_cottage_a',  col: 17, row: 20, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_cottage_b',  col: 20, row: 24, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_stone',      col: 4,  row: 30, footCols: 3, footRows: 3, scale: 2.6 },
+      { key: 'house_inn',        col: 18, row: 32, footCols: 4, footRows: 3, scale: 3.0 },
     ];
 
     // Curved paths connecting well to key destinations.
@@ -439,30 +483,50 @@ export default class IslandScene extends Phaser.Scene {
     this.physics.add.existing(wellRect, true);
     this.walls.add(wellRect);
 
-    houses.forEach(({ key, x, y, colW, colH, shop, label }) => {
-      const img = this.add.image(x, y, key).setOrigin(0.5, 1);
-      img.setDepth(y - 1);
-      // Building footprint - a wide, shallow rectangle at the base.
-      const rect = this.add.rectangle(x, y - colH / 2, colW, colH, 0, 0);
-      this.physics.add.existing(rect, true);
-      this.walls.add(rect);
+    // Umrechnung Village-lokaler (col,row) -> absolute Weltkoord.
+    const vColBase = Math.floor(OFFSET / T);
+    const vRowBase = Math.floor(OFFSET / T);
+
+    houses.forEach(({ key, col, row, footCols, footRows, scale = 2.6, shop, label }) => {
+      const absCol = vColBase + col;
+      const absRow = vRowBase + row;
+      // Weltkoords der Türkachel (unten-mittig des Haus-Fussabdrucks).
+      const doorWorld = this.walkableGrid.cellToWorld(absCol, absRow);
+      // Der Fussabdruck erstreckt sich footCols breit, footRows hoch nach OBEN.
+      const footLeftCol = absCol - Math.floor(footCols / 2);
+      const footTopRow = absRow - (footRows - 1);
+
+      // Grid-Zellen markieren: gesamter Footprint = WALL, Türkachel = DOOR.
+      for (let r = footTopRow; r <= absRow; r++) {
+        for (let c = footLeftCol; c < footLeftCol + footCols; c++) {
+          this.walkableGrid.set(c, r, CELL.WALL);
+        }
+      }
+
+      // Sprite so platzieren, dass die Tür genau auf die Türkachel fällt.
+      // Origin (0.5, 1) ankert Sprite an seiner Unterkante Mitte, was
+      // für unsere Häuser-Sprites (Tür am unteren Rand) genau passt.
+      const img = this.add.image(doorWorld.x, doorWorld.y + T / 2, key)
+        .setOrigin(0.5, 1)
+        .setScale(scale);
+      img.setDepth(doorWorld.y + T / 2 - 1);
       this.houses.push(img);
 
       if (shop) {
-        // Black doorway portal painted into the base of the house so the
-        // player sees where to walk in. The doorway is COLLISION-CUT out
-        // of the house footprint above (colH stops just above the door).
-        this.paintDoorwayPortal(x, y);
-        // Warp zone right in the doorway.
-        const zone = this.add.zone(x, y - 4, 22, 12);
-        this.physics.add.existing(zone, true);
-        zone.warpKind = 'shop';
-        zone.shopKind = shop;
-        zone.returnX = x;
-        zone.returnY = y + 30;
-        this.warpZones.push(zone);
+        // Schwarzes Türrechteck exakt AUF die Türkachel (Zellenmitte).
+        // Das Portal soll aussehen als öffne sich die Hauswand darauf zu.
+        this.paintDoorwayPortalOnHouse(doorWorld.x, doorWorld.y + T / 2 - 2, T - 8, T - 4, doorWorld.y + T / 2);
+        // Warp-Event auf Türkachel registrieren.
+        this.walkableGrid.addWarp(absCol, absRow, {
+          kind: 'shop',
+          shopKind: shop,
+          returnX: doorWorld.x,
+          returnY: doorWorld.y + T, // Player kommt eine Kachel unterhalb raus
+        });
 
-        // Sign in front of the door.
+        // Sign eine Kachel unter der Tür, damit er sichtbar bleibt.
+        const x = doorWorld.x;
+        const y = doorWorld.y + T + 2;
         this.add
           .text(x, y + 22, label, {
             fontFamily: 'Georgia, serif',
@@ -481,18 +545,26 @@ export default class IslandScene extends Phaser.Scene {
   // dark portal you can visibly walk into. Rendered slightly ABOVE the
   // house baseline so it looks recessed into the wall.
   paintDoorwayPortal(x, y, width = 20, height = 28) {
-    // Outer dark wooden frame.
+    this.paintDoorwayPortalOnHouse(x, y, width, height, y);
+  }
+
+  // Paints the black doorway portal so it sits ON TOP of the house sprite
+  // (whose depth is anchored at anchorY-1). We render at anchorY + 0.1 so
+  // both the frame and inner black are visible over the wall texture.
+  paintDoorwayPortalOnHouse(x, y, width, height, anchorY) {
+    const d = anchorY + 0.1;
+    // Dark wooden frame (slightly larger than the black opening).
     this.add
-      .rectangle(x, y - height / 2 - 2, width + 6, height + 4, 0x2a1a0e)
-      .setDepth(y - 0.4);
+      .rectangle(x, y - height / 2, width + 4, height + 3, 0x2a1a0e)
+      .setDepth(d);
     // Black interior of the doorway.
     this.add
-      .rectangle(x, y - height / 2 - 2, width, height, 0x000000)
-      .setDepth(y - 0.3);
-    // Blue-black highlight at the very top hints at receding depth.
+      .rectangle(x, y - height / 2, width, height, 0x000000)
+      .setDepth(d + 0.05);
+    // Subtle top gradient hint of receding depth.
     this.add
-      .rectangle(x, y - height + 2, width - 6, 3, 0x0a1420, 0.75)
-      .setDepth(y - 0.2);
+      .rectangle(x, y - height + 2, Math.max(4, width - 6), 3, 0x0a1420, 0.75)
+      .setDepth(d + 0.1);
   }
 
   // Central warp dispatcher. Zones set their kind + payload; this decides
@@ -501,8 +573,11 @@ export default class IslandScene extends Phaser.Scene {
   triggerWarp(zone) {
     if (this._warping) return;
     if (this.time.now < (this._warpGraceUntil || 0)) return;
+    // Support both legacy overlap-zone objects and grid warp payloads.
+    const kind = zone.warpKind ?? zone.kind;
+    zone.warpKind = kind;
     // Arena warp is guarded by the field-clear rule.
-    if (zone.warpKind === 'arena' && this.outdoorEnemyCount > 0) {
+    if (kind === 'arena' && this.outdoorEnemyCount > 0) {
       const now = this.time.now;
       if (!this._gateWarnAt || now - this._gateWarnAt > 1500) {
         this._gateWarnAt = now;
@@ -583,32 +658,31 @@ export default class IslandScene extends Phaser.Scene {
     const houseY = CASTLE_ORIGIN_Y + CASTLE_ROWS * T; // baseline
     // Big manor sprite. We reuse arena_gatehouse which was designed for
     // exactly this purpose.
-    const img = this.add.image(houseX, houseY, 'arena_gatehouse').setOrigin(0.5, 1);
+    const scale = 2.0;
+    const img = this.add.image(houseX, houseY, 'arena_gatehouse').setOrigin(0.5, 1).setScale(scale);
     img.setDepth(houseY - 1);
     this.houses.push(img);
 
     // Collision: two rectangles flanking the doorway so you cannot walk
     // THROUGH the manor - only into the doorway portal.
-    const footprintW = 130;
-    const footprintH = 50;
+    const footprintW = Math.round(img.width * scale * 0.85);
+    const footprintH = 60;
     const doorW = 26;
-    const leftW = (footprintW - doorW) / 2;
     this.addWallRect(houseX - footprintW / 2, houseY - footprintH, houseX - doorW / 2, houseY - 6);
     this.addWallRect(houseX + doorW / 2, houseY - footprintH, houseX + footprintW / 2, houseY - 6);
 
-    // Doorway portal - drawn ABOVE the manor's own art so the black hole
-    // reads unambiguously.
-    this.paintDoorwayPortal(houseX, houseY - 4, 22, 30);
+    // Doorway portal painted INTO the manor's ground-floor gate opening.
+    this.paintDoorwayPortalOnHouse(houseX, houseY - 4, doorW, 34, houseY);
 
     // Warp zone in the doorway.
-    const zone = this.add.zone(houseX, houseY - 8, 22, 12);
+    const zone = this.add.zone(houseX, houseY - 8, doorW, 20);
     this.physics.add.existing(zone, true);
     zone.warpKind = 'arena';
     this.warpZones.push(zone);
 
     // "Arena" sign above the door.
     this.add
-      .text(houseX, houseY - footprintH - 6, 'ARENA', {
+      .text(houseX, houseY - img.height * scale - 6, 'ARENA', {
         fontFamily: 'Georgia, serif',
         fontSize: '14px',
         color: '#f5cf4a',
@@ -643,22 +717,26 @@ export default class IslandScene extends Phaser.Scene {
       }
       const chest = spawnChest(this, loot, x, y);
       chest.isDiscoveryChest = true;
-      if (this.pickups) this.pickups.add(chest); // pickups group may not exist yet
-      else {
-        this._pendingDiscoveryChests = this._pendingDiscoveryChests || [];
-        this._pendingDiscoveryChests.push(chest);
-      }
+      this.pickups.add(chest);
     });
   }
 
-  // Places a rock sprite AND its physical collision rectangle. Used both
-  // by decoration scatter and by discovery pockets so no rock can be
-  // walked through anymore.
+  // Places a rock sprite AND its physical collision rectangle. The
+  // hitbox is deliberately small - covering only the visible base of
+  // the rock, so the player can walk past neighbouring rocks without
+  // getting snagged.
   spawnCollidableRock(x, y) {
-    const key = this.cfg.groundTile === 'tile_stone' ? 'rock' : 'rock';
-    const img = this.add.image(x, y, key).setOrigin(0.5, 0.9).setDepth(y - 1);
-    // Rock hitbox: an ellipse-ish rect at the base of the sprite.
-    const rect = this.add.rectangle(x, y - 6, 24, 14, 0, 0);
+    const img = this.add.image(x, y, 'rock').setOrigin(0.5, 0.9).setDepth(y - 1);
+    // Rock hitbox als 1-Tile-Blocker: exakt die Zelle unter dem Fels ist
+    // WALL, der Sprite hängt visuell drüber - klassisches Pokemon.
+    const g = this.walkableGrid;
+    if (g) {
+      const cellPos = g.worldToCell(x, y);
+      // Nur die Kachel die der Sprite tatsächlich belegt sperren.
+      g.set(cellPos.col, cellPos.row, CELL.WALL);
+    }
+    // Physics-Body für Kollisionen mit Feinden/Projektilen.
+    const rect = this.add.rectangle(x, y - 4, 20, 14, 0, 0);
     this.physics.add.existing(rect, true);
     this.walls.add(rect);
     this.houses.push(img);
@@ -720,8 +798,14 @@ export default class IslandScene extends Phaser.Scene {
           img.setOrigin(0.5, 0.6).setDepth(2);
         } else if (key === 'tree' || key === 'pine_tree') {
           img.setOrigin(0.5, 0.9).setDepth(worldY - 1);
-          // Trees also collide - tighter trunk hitbox at the base.
-          const rect = this.add.rectangle(worldX, worldY - 6, 18, 12, 0, 0);
+          // Bäume als 1-Tile-Blocker im Grid (unter dem Stamm),
+          // plus tighter physics-Body für Feinde/Projektile.
+          const g = this.walkableGrid;
+          if (g) {
+            const cp = g.worldToCell(worldX, worldY);
+            g.set(cp.col, cp.row, CELL.WALL);
+          }
+          const rect = this.add.rectangle(worldX, worldY - 4, 14, 10, 0, 0);
           this.physics.add.existing(rect, true);
           this.walls.add(rect);
         } else if (key === 'bush') {

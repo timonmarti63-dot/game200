@@ -160,13 +160,18 @@ export default class UIScene extends Phaser.Scene {
       this.bossName.setVisible(false);
     });
     island.events.on('toast', this.showToast, this);
-    island.events.on('hint', (t) => this.hint.setText(t ?? ''));
+    const hintHandler = (t) => {
+      // Nach shutdown kann this.hint bereits weg sein.
+      if (this.hint && this.hint.setText) this.hint.setText(t ?? '');
+    };
+    island.events.on('hint', hintHandler);
 
     this.events.once('shutdown', () => {
       island.events.off('hpChanged', this.updateHearts, this);
       island.events.off('inventoryChanged', this.updateHotbar, this);
       island.events.off('bossHpChanged', this.updateBossBar, this);
       island.events.off('toast', this.showToast, this);
+      island.events.off('hint', hintHandler);
       this.registry.events.off('changedata-silver', this.refreshCurrency, this);
       this.registry.events.off('changedata-gold', this.refreshCurrency, this);
     });

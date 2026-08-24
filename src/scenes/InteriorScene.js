@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../entities/Player.js';
 import { Sfx } from '../systems/Sfx.js';
+import { WalkableGrid, CELL } from '../systems/Grid.js';
 
 const T = 32;
 const ROOM_W = 15 * T; // 480
@@ -52,6 +53,38 @@ export default class InteriorScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#1b1210');
     this.physics.world.setBounds(0, 0, ROOM_W, ROOM_H);
+
+    // Grid für Innenraum (Pokemon-Stil): 15x10 Kacheln. Alle Wandkacheln
+    // äusserlich sind WALL, die Türkachel unten mittig ist DOOR (Warp
+    // zurück zur Insel).
+    const cols = Math.ceil(ROOM_W / T);
+    const rows = Math.ceil(ROOM_H / T);
+    this.walkableGrid = new WalkableGrid(cols, rows, T);
+    // Äussere Wände als WALL. Oben (Reihen 0,1) sind Wand+Fenster,
+    // unten (Reihe rows-1) auch Wand ausser Türkachel.
+    for (let c = 0; c < cols; c++) {
+      this.walkableGrid.set(c, 0, CELL.WALL);
+      this.walkableGrid.set(c, 1, CELL.WALL); // Wand mit Bildern/Fenstern
+      this.walkableGrid.set(c, rows - 1, CELL.WALL);
+    }
+    for (let r = 0; r < rows; r++) {
+      this.walkableGrid.set(0, r, CELL.WALL);
+      this.walkableGrid.set(cols - 1, r, CELL.WALL);
+    }
+    // Türkachel: unten mittig - Warp zurück zur Insel.
+    const doorCol = Math.floor(cols / 2);
+    const doorRow = rows - 1;
+    this.walkableGrid.addWarp(doorCol, doorRow, {
+      kind: 'exit',
+      returnScene: this.returnScene,
+      returnX: this.returnX,
+      returnY: this.returnY,
+    });
+    // Ladentheke (Zeile 4-5) als WALL - blockiert.
+    const counterRow = 4;
+    for (let c = 2; c < cols - 2; c++) {
+      this.walkableGrid.set(c, counterRow, CELL.WALL);
+    }
 
     // Wooden floor - tiled 32x32.
     this.add.tileSprite(ROOM_W / 2, ROOM_H / 2, ROOM_W, ROOM_H, 'tile_floor_wood').setDepth(0);
@@ -162,9 +195,11 @@ export default class InteriorScene extends Phaser.Scene {
     this.interactZone = this.add.zone(ROOM_W / 2, counterY + 6, ROOM_W - 140, 40);
     this.physics.add.existing(this.interactZone, true);
 
-    // Spawn the player just below the counter so they don't spawn on the
-    // exit door and immediately re-trigger the island transition.
-    this.player = new Player(this, ROOM_W / 2, ROOM_H - 60);
+    // Spawn the player just below the counter (Grid-Mitte) so they don't
+    // spawn on the exit door and immediately re-trigger the island warp.
+    const spawn = this.walkableGrid.cellToWorld(doorCol, doorRow - 2);
+    this.player = new Player(this, spawn.x, spawn.y);
+    this._warpGraceUntil = this.time.now + 700;
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
     this.cameras.main.setBounds(0, 0, ROOM_W, ROOM_H);
     this.cameras.main.setZoom(1);
@@ -186,8 +221,12 @@ export default class InteriorScene extends Phaser.Scene {
       this.scene.pause();
     });
 
+    // Inventar-Toggle auch in den Läden. Player emittiert das Event
+    // beim Drücken von I; hier hängen wir den Handler ein.
+    this.events.on('toggleInventory', this.openInventory, this);
+
     // Reveal the hint bar.
-    this.events.emit('hint', '[E] Kaufen   [↓] Ausgang');
+    this.events.emit('hint', '[E] Kaufen   [I] Inventar   [\u2193] Ausgang');
 
     // The UIScene needs to know which scene events to listen to; interior
     // shops share the same UI HUD.
@@ -198,16 +237,43 @@ export default class InteriorScene extends Phaser.Scene {
     // no need to also toast it, which used to double-print.
   }
 
+  openInventory() {
+    if (this.scene.isActive('Inventory')) return;
+    if (this.scene.isActive('Shop')) return;
+    this.scene.launch('Inventory', { islandSceneKey: 'Interior' });
+    this.scene.pause();
+  }
+
+  // Grid-Warp Dispatcher: der Player ruft triggerWarp(payload) auf,
+  // sobald er auf einer DOOR-Zelle landet. Wir bauen ab hier auf
+  // returnToIsland, das die eigentliche Scene-Umschaltung macht.
+  triggerWarp(warp) {
+    if (this._warping) return;
+    if (this.time.now < (this._warpGraceUntil || 0)) return;
+    if (warp.kind !== 'exit') return;
+    this._warping = true;
+    this.returnToIsland();
+  }
+
   returnToIsland() {
     if (this.returning) return;
     this.returning = true;
     Sfx.uiToggle();
-    // Stop the UI cleanly, then swap scenes back to the island.
-    this.scene.stop('UI');
-    this.scene.start(this.returnScene, {
-      returningFromInterior: true,
-      returnX: this.returnX,
-      returnY: this.returnY,
+    // Fade-out first, then hard-cleanup ALLE Nebenszenen und wechseln.
+    // Ohne Fade+Delay crashten wir manchmal weil Player.preUpdate noch
+    // gegen ein bereits zerstörtes UI zeichnete.
+    this.cameras.main.fadeOut(180, 0, 0, 0);
+    this.time.delayedCall(200, () => {
+      try { this.scene.stop('Shop'); } catch (e) {}
+      try { this.scene.stop('Inventory'); } catch (e) {}
+      try { this.scene.stop('UI'); } catch (e) {}
+      // Player-Physik/Events zuerst zerstören, dann Szene neu starten.
+      try { this.player?.destroy(); } catch (e) {}
+      this.scene.start(this.returnScene, {
+        returningFromInterior: true,
+        returnX: this.returnX,
+        returnY: this.returnY,
+      });
     });
   }
 }

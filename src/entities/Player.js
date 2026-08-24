@@ -155,6 +155,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.handleHotbarKeys(time);
     this.handleInventoryKey(time);
     this.updateWalkBob(delta);
+    // Y-sort: player renders in front of anything whose baseline is
+    // above the player's feet and behind anything below.
+    this.setDepth(this.y);
 
     // Keep the sword anchored in front of the player while a swing is
     // running. When not attacking, hide the sword so idle Rüdiger doesn't
@@ -180,24 +183,129 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  // GRID-Movement (Pokemon-Stil):
+  // - Der Player rastert immer auf 32px-Zellen.
+  // - Bei Tastendruck wird eine Bewegung zur Nachbar-Zelle initialisiert;
+  //   während die Bewegung läuft ist der Player "in transit" und die
+  //   Position wird linear zum Zielpunkt interpoliert.
+  // - Wenn eine Richtungstaste weiterhin gehalten wird UND die Zielzelle
+  //   frei ist, wird direkt der nächste Schritt eingeleitet - so entsteht
+  //   flüssiges Laufen ohne Micro-Stops.
+  // - Ist die Zielzelle blockiert, dreht sich der Player nur (facing) und
+  //   bleibt stehen. Genau wie in klassischen Pokemon-Spielen.
   handleMovement(time) {
     if (this.dodging || this.grappling) return;
-    const k = this.keys;
-    const dir = new Phaser.Math.Vector2(0, 0);
-    if (k.left.isDown || k.left2.isDown) dir.x -= 1;
-    if (k.right.isDown || k.right2.isDown) dir.x += 1;
-    if (k.up.isDown || k.up2.isDown) dir.y -= 1;
-    if (k.down.isDown || k.down2.isDown) dir.y += 1;
-
-    if (dir.lengthSq() > 0) {
-      dir.normalize();
-      this.facing.copy(dir);
-      this.facingName = dirName(dir);
+    const scene = this.scene;
+    const grid = scene.walkableGrid;
+    if (!grid) {
+      // Fallback: freies Movement wenn keine Grid vorhanden ist.
+      this.setVelocity(0, 0);
+      return;
     }
 
-    const grailActive = time < this.grailActiveUntil;
-    const speed = grailActive ? GRAIL_SPEED : SPEED;
-    this.setVelocity(dir.x * speed, dir.y * speed);
+    const k = this.keys;
+    // Prioritäts-Reihenfolge: die ZULETZT gedrückte Richtung gewinnt.
+    // Das ist die klassische Pokemon-Regel und verhindert Diagonal-Stotter.
+    const wantLeft = k.left.isDown || k.left2.isDown;
+    const wantRight = k.right.isDown || k.right2.isDown;
+    const wantUp = k.up.isDown || k.up2.isDown;
+    const wantDown = k.down.isDown || k.down2.isDown;
+
+    // Wenn wir gerade zwischen zwei Zellen sind: weiterinterpolieren.
+    if (this._moving) {
+      const dx = this._targetX - this.x;
+      const dy = this._targetY - this.y;
+      const dist2 = dx * dx + dy * dy;
+      const grailActive = time < this.grailActiveUntil;
+      const speed = grailActive ? GRAIL_SPEED : SPEED;
+      if (dist2 < 4) {
+        // Angekommen - snap auf Zelle.
+        this.setPosition(this._targetX, this._targetY);
+        this.setVelocity(0, 0);
+        this._moving = false;
+        // Pickup-Zellen einsammeln (Truhen, Items).
+        this._collectAtCurrentCell();
+        // Warp-Zellen auslösen.
+        this._checkWarpAtCurrentCell();
+      } else {
+        // Linear zum Ziel.
+        const len = Math.sqrt(dist2);
+        const vx = (dx / len) * speed;
+        const vy = (dy / len) * speed;
+        this.setVelocity(vx, vy);
+      }
+    }
+
+    if (this._moving) return;
+
+    // Nicht in Bewegung: neue Richtung wählen (falls Taste gedrückt).
+    let dcol = 0;
+    let drow = 0;
+    // Reihenfolge: horizontale Präferenz wenn beide gedrückt.
+    if (wantLeft) { dcol = -1; drow = 0; }
+    else if (wantRight) { dcol = 1; drow = 0; }
+    else if (wantUp) { dcol = 0; drow = -1; }
+    else if (wantDown) { dcol = 0; drow = 1; }
+
+    if (dcol === 0 && drow === 0) {
+      this.setVelocity(0, 0);
+      return;
+    }
+
+    // Facing sofort setzen (auch wenn Zelle blockiert - man dreht sich).
+    this.facing.set(dcol, drow);
+    this.facingName = dirName(this.facing);
+
+    // Zielzelle bestimmen.
+    const here = grid.worldToCell(this.x, this.y);
+    const tcol = here.col + dcol;
+    const trow = here.row + drow;
+
+    if (!grid.isWalkable(tcol, trow)) {
+      // Wand - stehen bleiben, aber facing zeigt in die Richtung.
+      this.setVelocity(0, 0);
+      return;
+    }
+
+    // Bewegung einleiten.
+    const target = grid.cellToWorld(tcol, trow);
+    this._moving = true;
+    this._targetX = target.x;
+    this._targetY = target.y;
+  }
+
+  // Sammelt Items/Truhen auf der aktuellen Kachel automatisch ein
+  // (klassisches Pokemon-Verhalten: Item liegt am Boden, wird beim
+  // Drüber-Laufen aufgehoben). Chests brauchen keine E-Taste mehr.
+  _collectAtCurrentCell() {
+    const scene = this.scene;
+    if (!scene.pickups) return;
+    // Alle Pickups durchgehen und den räumlich nächsten unter uns finden.
+    const arr = scene.pickups.getChildren();
+    for (const p of arr) {
+      if (!p.active) continue;
+      const dx = p.x - this.x;
+      const dy = p.y - this.y;
+      if (dx * dx + dy * dy < 400) { // ~1 Zelle Radius
+        if (typeof scene.onPlayerPickup === 'function') {
+          scene.onPlayerPickup(p);
+        }
+      }
+    }
+  }
+
+  // Wenn die aktuelle Zelle eine Warp-Zelle ist, löse den Warp aus.
+  _checkWarpAtCurrentCell() {
+    const scene = this.scene;
+    const grid = scene.walkableGrid;
+    if (!grid) return;
+    const here = grid.worldToCell(this.x, this.y);
+    if (grid.get(here.col, here.row) === 2 /* CELL.DOOR */) {
+      const warp = grid.getWarp(here.col, here.row);
+      if (warp && typeof scene.triggerWarp === 'function') {
+        scene.triggerWarp(warp);
+      }
+    }
   }
 
   handleAttack(time) {
@@ -226,8 +334,28 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.sword.setPosition(pivotX, pivotY);
     this.sword.setRotation(startAngle);
     this.sword.setAlpha(1);
-    this.sword.setScale(1);
+    this.sword.setScale(1.6);
     this.sword.setVisible(true);
+    // Ensure sword always renders above player and props during a swing.
+    this.sword.setDepth(1e6);
+
+    // Bright slash arc that sweeps behind the sword tip for readability.
+    if (this.scene.textures.exists('slash_vfx')) {
+      const slash = this.scene.add.image(pivotX, pivotY, 'slash_vfx')
+        .setOrigin(0.5, 1)
+        .setRotation(baseAngle)
+        .setScale(1.6)
+        .setAlpha(0.9)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(1e6 - 1);
+      this.scene.tweens.add({
+        targets: slash,
+        scale: 2.2,
+        alpha: 0,
+        duration: 220,
+        onComplete: () => slash.destroy(),
+      });
+    }
 
     // A single tween drives the whole swing; the follow-in updater keeps
     // the sword anchored in front of the player as they move.
@@ -237,14 +365,14 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this._swingTween = this.scene.tweens.add({
       targets: this.sword,
       rotation: endAngle,
-      scale: { from: 0.9, to: 1.15 },
+      scale: { from: 1.4, to: 1.8 },
       duration: 180,
       ease: 'Cubic.easeOut',
       onComplete: () => {
         this.scene.tweens.add({
           targets: this.sword,
           alpha: 0,
-          scale: 1,
+          scale: 1.6,
           duration: 90,
           onComplete: () => this.sword.setVisible(false),
         });
