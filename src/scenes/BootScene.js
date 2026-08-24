@@ -46,6 +46,20 @@ const SPRITES = [
   'pine_tree',
   'mine_entrance',
   'grapple_hook',
+  'grendal_hammer',
+  // Post-processing enhancements (see tools/enhance_pixel_art.py)
+  'shadow_blob',
+  'tile_water_0',
+  'tile_water_1',
+  'tile_water_2',
+  'tile_water_3',
+  'tile_grass_1',
+  'tile_grass_2',
+  'tile_sand_1',
+  'tile_stone_1',
+  'beach_edge',
+  'slash_vfx',
+  'spark',
 ];
 
 export default class BootScene extends Phaser.Scene {
@@ -54,7 +68,10 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    SPRITES.forEach((key) => this.load.image(key, `/sprites/${key}.png`));
+    // Use a relative path so the built site loads sprites correctly whether
+    // it's served from the domain root (Vite dev) or a subpath (S3 proxy /
+    // GitHub Pages).
+    SPRITES.forEach((key) => this.load.image(key, `sprites/${key}.png`));
   }
 
   create() {

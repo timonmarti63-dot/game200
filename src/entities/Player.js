@@ -319,13 +319,22 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   takeDamage(amount, sourceX, sourceY, time) {
     if (this.dead || this.isInvulnerable(time)) return;
     this.hp = Math.max(0, this.hp - amount);
-    this.invulnerableUntil = time + 700;
+    this.invulnerableUntil = time + 900;
     this.scene.events.emit('hpChanged', this.hp, this.maxHp);
-    this.setTint(0xff6666);
-    this.scene.time.delayedCall(140, () => this.clearTint());
 
+    // Bright white flash for hit impact, then i-frame blink for the remainder.
+    this.setTintFill(0xffffff);
+    this.scene.time.delayedCall(90, () => {
+      this.clearTint();
+      this.startIFrameBlink(time + 900);
+    });
+
+    // Stronger, snappier knockback than before.
     const away = new Phaser.Math.Vector2(this.x - sourceX, this.y - sourceY).normalize();
-    this.setVelocity(away.x * 220, away.y * 220);
+    this.setVelocity(away.x * 280, away.y * 280);
+
+    // Impact camera shake scales with damage.
+    this.scene.cameras.main.shake(120, 0.005 + Math.min(0.01, amount * 0.003));
 
     if (this.hp <= 0) {
       this.dead = true;
@@ -334,6 +343,21 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     } else {
       Sfx.playerHurt();
     }
+  }
+
+  startIFrameBlink(until) {
+    // Alpha blink until i-frames end - clear visual signal that i-frames are active.
+    const tick = () => {
+      if (this.dead) return;
+      const now = this.scene.time.now;
+      if (now >= until) {
+        this.setAlpha(1);
+        return;
+      }
+      this.setAlpha(this.alpha > 0.7 ? 0.4 : 1);
+      this.scene.time.delayedCall(80, tick);
+    };
+    tick();
   }
 
   heal(amount) {

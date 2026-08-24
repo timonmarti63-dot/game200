@@ -181,7 +181,23 @@ export default class IslandScene extends Phaser.Scene {
     );
     this.cameras.main.setBounds(0, 0, OUTDOOR_W, OUTDOOR_H);
 
-    this.add.tileSprite(0, 0, OUTDOOR_W, OUTDOOR_H, 'tile_water').setOrigin(0, 0);
+    // Animated water: swap between 4 water frames every 220ms. tile_water_0..3
+    // encode drifting highlight ripples so the sea shimmers instead of sitting
+    // flat under everything.
+    this.waterFrames = ['tile_water_0', 'tile_water_1', 'tile_water_2', 'tile_water_3'];
+    this.waterFrame = 0;
+    this.waterSprite = this.add
+      .tileSprite(0, 0, OUTDOOR_W, OUTDOOR_H, this.waterFrames[0])
+      .setOrigin(0, 0);
+    this.time.addEvent({
+      delay: 220,
+      loop: true,
+      callback: () => {
+        this.waterFrame = (this.waterFrame + 1) % this.waterFrames.length;
+        this.waterSprite.setTexture(this.waterFrames[this.waterFrame]);
+      },
+    });
+
     this.add
       .tileSprite(
         OFFSET - BEACH_MARGIN,
@@ -192,6 +208,18 @@ export default class IslandScene extends Phaser.Scene {
       )
       .setOrigin(0, 0);
     this.add.tileSprite(OFFSET, OFFSET, GRASS_W, GRASS_H, cfg.groundTile).setOrigin(0, 0);
+
+    // Sprinkle tile variants (grass tufts, flowers, sand pebbles, stone
+    // cracks) as small overlaid patches so the ground stops looking uniform.
+    this.scatterGroundVariants();
+
+    // Foam edge along the beach - purely decorative but sells the coastline.
+    this.paintBeachFoam();
+
+    // Shadow layer: every actor gets a soft drop-shadow blob rendered from
+    // this group so they no longer float above the ground.
+    this.shadowLayer = this.add.group();
+    this.actorShadows = new Map();
 
     this.arenaFloor = this.add
       .tileSprite(ARENA_X, ARENA_Y, ARENA_W, ARENA_H, cfg.floorTile)
@@ -221,6 +249,7 @@ export default class IslandScene extends Phaser.Scene {
     this.gateZone.body.moves = false;
 
     this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
+    this.attachShadow(this.player, { scaleX: 1, alpha: 0.55 });
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.enemies = this.physics.add.group();
     this.pickups = this.physics.add.group();
@@ -382,9 +411,63 @@ export default class IslandScene extends Phaser.Scene {
         const e = new Class(this, x, y);
         e.isOutdoor = true;
         this.enemies.add(e);
+        this.attachShadow(e, { scaleX: 0.9, alpha: 0.5 });
         this.outdoorEnemyCount++;
       });
     });
+  }
+
+  attachShadow(actor, { scaleX = 1, alpha = 0.55, yOffset = 12 } = {}) {
+    const shadow = this.add.image(actor.x, actor.y + yOffset, 'shadow_blob');
+    shadow.setOrigin(0.5, 0.5).setAlpha(alpha).setScale(scaleX, 1);
+    this.shadowLayer.add(shadow);
+    // baseAlpha + baseScale so the update loop can restore them after airborne dip.
+    this.actorShadows.set(actor, { shadow, yOffset, baseAlpha: alpha, baseScale: scaleX });
+  }
+
+  scatterGroundVariants() {
+    const cfg = this.cfg;
+    const variants = [];
+    if (cfg.groundTile === 'tile_grass') variants.push('tile_grass_1', 'tile_grass_2');
+    if (cfg.groundTile === 'tile_stone') variants.push('tile_stone_1');
+    if (variants.length === 0) return;
+    const count = 90;
+    for (let i = 0; i < count; i++) {
+      const x = Phaser.Math.Between(OFFSET, OFFSET + GRASS_W - T);
+      const y = Phaser.Math.Between(OFFSET, OFFSET + GRASS_H - T);
+      if (this.isDecorationExcluded(x - OFFSET - VILLAGE_W, y - OFFSET)) continue;
+      const key = Phaser.Utils.Array.GetRandom(variants);
+      this.add.image(x, y, key).setDepth(0.2);
+    }
+
+    // Sand variants around the beach ring
+    if (cfg.beachTile === 'tile_sand') {
+      for (let i = 0; i < 40; i++) {
+        const side = Phaser.Math.Between(0, 3);
+        let x, y;
+        if (side === 0) { x = Phaser.Math.Between(OFFSET - BEACH_MARGIN, OFFSET + GRASS_W + BEACH_MARGIN); y = OFFSET - BEACH_MARGIN + Phaser.Math.Between(0, BEACH_MARGIN); }
+        else if (side === 1) { x = Phaser.Math.Between(OFFSET - BEACH_MARGIN, OFFSET + GRASS_W + BEACH_MARGIN); y = OFFSET + GRASS_H + Phaser.Math.Between(-BEACH_MARGIN, BEACH_MARGIN); }
+        else if (side === 2) { y = Phaser.Math.Between(OFFSET - BEACH_MARGIN, OFFSET + GRASS_H + BEACH_MARGIN); x = OFFSET - BEACH_MARGIN + Phaser.Math.Between(0, BEACH_MARGIN); }
+        else { y = Phaser.Math.Between(OFFSET - BEACH_MARGIN, OFFSET + GRASS_H + BEACH_MARGIN); x = OFFSET + GRASS_W + Phaser.Math.Between(-BEACH_MARGIN, BEACH_MARGIN); }
+        this.add.image(x, y, 'tile_sand_1').setDepth(0.2);
+      }
+    }
+  }
+
+  paintBeachFoam() {
+    // draw a broken foam line just outside the sand ring on all four sides
+    const x0 = OFFSET - BEACH_MARGIN;
+    const y0 = OFFSET - BEACH_MARGIN;
+    const w = GRASS_W + BEACH_MARGIN * 2;
+    const h = GRASS_H + BEACH_MARGIN * 2;
+    for (let x = x0; x < x0 + w; x += 32) {
+      if (Math.random() < 0.7) this.add.image(x, y0 - 3, 'beach_edge').setOrigin(0, 0.5).setDepth(0.3);
+      if (Math.random() < 0.7) this.add.image(x, y0 + h + 3, 'beach_edge').setOrigin(0, 0.5).setDepth(0.3);
+    }
+    for (let y = y0; y < y0 + h; y += 32) {
+      if (Math.random() < 0.7) this.add.image(x0 - 3, y, 'beach_edge').setOrigin(0, 0.5).setDepth(0.3).setRotation(Math.PI / 2);
+      if (Math.random() < 0.7) this.add.image(x0 + w + 3, y, 'beach_edge').setOrigin(0, 0.5).setDepth(0.3).setRotation(Math.PI / 2);
+    }
   }
 
   spawnOutdoorPickups() {
@@ -399,7 +482,20 @@ export default class IslandScene extends Phaser.Scene {
   }
 
   onPlayerAttack({ x, y, angle, range, damage }) {
+    // Slash arc VFX in front of the player
+    const slash = this.add.image(x, y, 'slash_vfx').setDepth(this.player.y + 2).setAlpha(0.95);
+    slash.setRotation(angle + Math.PI / 2);
+    slash.setScale(0.7);
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.15,
+      duration: 180,
+      onComplete: () => slash.destroy(),
+    });
+
     const dirVec = new Phaser.Math.Vector2(Math.cos(angle), Math.sin(angle));
+    let anyHit = false;
     this.enemies.getChildren().forEach((enemy) => {
       if (enemy.dead) return;
       const toEnemy = new Phaser.Math.Vector2(enemy.x - this.player.x, enemy.y - this.player.y);
@@ -408,8 +504,30 @@ export default class IslandScene extends Phaser.Scene {
       toEnemy.normalize();
       if (dirVec.dot(toEnemy) > 0.3) {
         enemy.takeDamage(damage, this.player.x, this.player.y, this.time.now);
+        this.spawnHitSparks(enemy.x, enemy.y);
+        anyHit = true;
       }
     });
+    if (anyHit) this.cameras.main.shake(70, 0.0035);
+  }
+
+  spawnHitSparks(x, y) {
+    for (let i = 0; i < 5; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 80;
+      const s = this.add.image(x, y, 'spark').setDepth(y + 5);
+      const tx = x + Math.cos(a) * 18;
+      const ty = y + Math.sin(a) * 18;
+      this.tweens.add({
+        targets: s,
+        x: tx,
+        y: ty,
+        alpha: 0,
+        scale: 0.4,
+        duration: 220,
+        onComplete: () => s.destroy(),
+      });
+    }
   }
 
   onPlayerParry({ x, y, range }) {
@@ -476,7 +594,9 @@ export default class IslandScene extends Phaser.Scene {
       this.cameras.main.setBounds(ARENA_X, ARENA_Y, ARENA_W, ARENA_H);
       this.boss = new this.cfg.BossClass(this, BOSS_SPAWN.x, BOSS_SPAWN.y);
       this.enemies.add(this.boss);
+      this.attachShadow(this.boss, { scaleX: 1.6, alpha: 0.6, yOffset: 18 });
       this.cameras.main.fadeIn(250, 0, 0, 0);
+      this.cameras.main.shake(180, 0.006);
       this.events.emit('toast', this.cfg.arenaGreeting);
       Sfx.gateOpen();
     });
@@ -638,6 +758,25 @@ export default class IslandScene extends Phaser.Scene {
       if (enemy.shield) enemy.shield.setDepth(enemy.y + 1);
       if (enemy.exclaim) enemy.exclaim.setDepth(enemy.y + 2);
     });
+
+    // Sync shadows with their actors. Shadow renders just below the sprite in
+    // the depth stack (actor.y - 1) so it stays above the ground but under the
+    // sprite itself. Shrinks and dims briefly while the actor is airborne
+    // (dodge / grapple) so movement reads better.
+    if (this.actorShadows) {
+      this.actorShadows.forEach((entry, actor) => {
+        if (!actor || actor.dead || !actor.active) {
+          entry.shadow.destroy();
+          this.actorShadows.delete(actor);
+          return;
+        }
+        entry.shadow.setPosition(actor.x, actor.y + entry.yOffset);
+        entry.shadow.setDepth(actor.y - 1);
+        const airborne = actor.dodging || actor.grappling;
+        entry.shadow.setAlpha(airborne ? 0.28 : (entry.baseAlpha ?? 0.55));
+        entry.shadow.setScale((entry.baseScale ?? 1) * (airborne ? 0.75 : 1), airborne ? 0.75 : 1);
+      });
+    }
 
     this.fogZones.forEach((zone) => {
       this.enemies.getChildren().forEach((enemy) => {

@@ -37,11 +37,26 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (this.dead) return;
     const bonus = this.isVulnerableBonus ? 2 : 1;
     this.hp -= amount * bonus;
-    this.setTint(0xffffff);
-    this.scene.time.delayedCall(100, () => this.clearTint());
+
+    // setTintFill overrides ALL sprite pixels with white -> a real hit flash
+    // (plain setTint just multiplies and barely reads on light sprites).
+    this.setTintFill(0xffffff);
+    this.scene.time.delayedCall(80, () => this.clearTint());
+
+    // Suppress the walk-bob squash for a moment so the hit punch reads clearly.
+    this.punchUntil = (this.scene.time.now || 0) + 140;
+    this.scene.tweens.add({
+      targets: this,
+      scaleX: 1.3,
+      scaleY: 0.75,
+      duration: 55,
+      yoyo: true,
+    });
 
     const away = new Phaser.Math.Vector2(this.x - sourceX, this.y - sourceY).normalize();
-    this.setVelocity(away.x * 160, away.y * 160);
+    // Stronger knockback for crits so parry-punished enemies really fly.
+    const kb = bonus > 1 ? 260 : 180;
+    this.setVelocity(away.x * kb, away.y * kb);
 
     if (this.hp <= 0) {
       this.die();
@@ -105,6 +120,8 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
   // No frame-by-frame walk cycle art - a light squash/stretch bob synced to
   // movement speed reads as "walking" without needing extra sprite frames.
   updateWalkBob(delta) {
+    // Yield to the hit-punch tween so it isn't clobbered every frame.
+    if (this.punchUntil && this.scene.time.now < this.punchUntil) return;
     const speed = this.body.velocity.length();
     if (speed > 8 && this.state !== 'stumble') {
       this.walkPhase += delta * 0.017 * Math.min(1.6, speed / Math.max(1, this.speed));

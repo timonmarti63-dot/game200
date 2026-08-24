@@ -46,6 +46,22 @@ Dann im Browser die angezeigte URL öffnen (Standard: http://localhost:5173).
 - `public/sprites/` – handgezeichnete Pixel-Art-PNGs (Spieler, Gegner, Bosse, Items, Häuser, Deko, Boot, Tiles), von BootScene geladen
 - `tools/generate_pixel_art.py` – Python/Pillow-Skript, das `public/sprites/` erzeugt; `python3 tools/generate_pixel_art.py` zum Neu-Generieren/Anpassen (legt zusätzlich ein Kontaktabzug-Preview unter `tools/_preview/` an)
 
+## Grafik- & Feel-Upgrade (letzter Pass)
+
+- **`tools/enhance_pixel_art.py`** läuft nach `generate_pixel_art.py` und macht die Pixel-Art
+  reicher, ohne den Generator selbst zu ersetzen: fügt jedem Character/Item-Sprite
+  eine gerichtete Kanten-Aufhellung + Ambient-Occlusion hinzu, erzeugt 4 animierte
+  Wasser-Frames (`tile_water_0..3`), Boden-Varianten (Grastufts, Blumeninseln,
+  Sandkiesel, Steinrisse), eine Strand-Foam-Kante, ein weiches Schatten-Blob,
+  einen Slash-Bogen und einen Trefferfunken.
+- **`IslandScene`** cycled die Wasser-Frames alle 220 ms, streut die Boden-Varianten
+  über Gras/Sand/Stein, malt Foam-Kanten um die Beach-Ring, hängt an jeden Actor
+  einen mitwandernden Schatten (dünnt im Ausweichen ab) und emittiert Slash-VFX +
+  Funken bei jedem Treffer.
+- **Hit-Feedback** in `Player` und `Enemy`: `setTintFill` statt `setTint` für einen
+  wirklich sichtbaren weißen Blitz, Squash/Stretch-Punch, kräftigerer Knockback,
+  Kamera-Shake bei Player-Schaden, i-Frame-Alpha-Blink.
+
 ## Nächste Schritte
 
 Möwenhort ist bisher nur als Insel-Grafik auf der Seekarte vorhanden, aber nicht begehbar (dritte Insel + Piraten-Boss stehen noch aus). Echte Lauf-Animationen (mehrere Sprite-Frames statt Bewegungs-Bobbing), Musik, sowie die übrigen GDD-Power-Ups (Bannerbuch, Selbstschussarmbrust, Glücksbringer-Hühnerfuß) sind noch nicht implementiert.
