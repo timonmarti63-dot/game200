@@ -513,9 +513,17 @@ export default class IslandScene extends Phaser.Scene {
       this.houses.push(img);
 
       if (shop) {
-        // Schwarzes Türrechteck exakt AUF die Türkachel (Zellenmitte).
-        // Das Portal soll aussehen als öffne sich die Hauswand darauf zu.
-        this.paintDoorwayPortalOnHouse(doorWorld.x, doorWorld.y + T / 2 - 2, T - 8, T - 4, doorWorld.y + T / 2);
+        // Schwarzes Türrechteck IN die gemalte Tür des Haus-Sprites setzen.
+        // Bei den grossen Häuser-Sprites (scale ~2.6) sitzt die Tür ca.
+        // 10-14% über der Sprite-Unterkante, nicht ganz unten. Wir nehmen
+        // den Sprite (bereits erzeugt) und legen das Portal in dessen
+        // untere Tür-Zone: portalY liegt ~T*0.9 unter der Sprite-Mitte.
+        const spriteBottomY = doorWorld.y + T / 2; // Sprite-Origin (0.5,1)
+        const portalX = doorWorld.x;
+        const portalY = spriteBottomY - T * 0.55;
+        const portalW = T * 0.7;
+        const portalH = T * 0.85;
+        this.paintDoorwayPortalOnHouse(portalX, portalY, portalW, portalH, spriteBottomY);
         // Warp-Event auf Türkachel registrieren.
         this.walkableGrid.addWarp(absCol, absRow, {
           kind: 'shop',
