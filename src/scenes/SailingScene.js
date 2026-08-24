@@ -76,7 +76,6 @@ export default class SailingScene extends Phaser.Scene {
     resetKeysOnBlur(this.keys, this.events);
 
     this.nearIsland = null;
-    this.input.keyboard.on('keydown-SPACE', () => this.tryInteract());
 
     this.add
       .text(16, 16, 'Segle mit WASD/Pfeilen. Fahr zu einer Insel und drücke Leertaste.', {
@@ -90,9 +89,22 @@ export default class SailingScene extends Phaser.Scene {
       .text(this.scale.width - 8, 8, '[C] ☁ Cloud-Speicher', { fontFamily: 'Courier New', fontSize: '9px', color: '#7f9cc9' })
       .setOrigin(1, 0)
       .setScrollFactor(0);
-    this.input.keyboard.on('keydown-C', () => {
+
+    // Bound handlers kept on `this` so they can be un-hooked by exact
+    // reference on shutdown - this scene instance is reused every time the
+    // player sails back out after an island visit, and Phaser does not
+    // clear `.on()` listeners on scene restart, so without this cleanup
+    // each return trip would double up the SPACE/C handlers.
+    this._onSpaceKey = () => this.tryInteract();
+    this._onCloudKey = () => {
       this.scene.pause();
       this.scene.launch('Account', { returnSceneKey: 'Sailing' });
+    };
+    this.input.keyboard.on('keydown-SPACE', this._onSpaceKey);
+    this.input.keyboard.on('keydown-C', this._onCloudKey);
+    this.events.once('shutdown', () => {
+      this.input.keyboard.off('keydown-SPACE', this._onSpaceKey);
+      this.input.keyboard.off('keydown-C', this._onCloudKey);
     });
   }
 

@@ -89,9 +89,20 @@ export default class TutorialScene extends Phaser.Scene {
       .text(width - 14, 14, 'Esc: überspringen', { fontFamily: 'Courier New', fontSize: '11px', color: '#9fb0c9' })
       .setOrigin(1, 0);
 
-    this.input.keyboard.on('keydown-SPACE', () => this.next());
-    this.input.keyboard.on('keydown-ESC', () => this.finish());
-    this.input.on('pointerdown', () => this.next());
+    // Bound by reference (not inline) so shutdown can remove exactly these -
+    // this scene instance is reused if the tutorial is replayed via [T],
+    // and Phaser never clears `.on()` listeners on restart by itself.
+    this._onSpaceKey = () => this.next();
+    this._onEscKey = () => this.finish();
+    this._onPointerDown = () => this.next();
+    this.input.keyboard.on('keydown-SPACE', this._onSpaceKey);
+    this.input.keyboard.on('keydown-ESC', this._onEscKey);
+    this.input.on('pointerdown', this._onPointerDown);
+    this.events.once('shutdown', () => {
+      this.input.keyboard.off('keydown-SPACE', this._onSpaceKey);
+      this.input.keyboard.off('keydown-ESC', this._onEscKey);
+      this.input.off('pointerdown', this._onPointerDown);
+    });
 
     this.renderPage();
   }

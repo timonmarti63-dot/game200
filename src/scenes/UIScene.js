@@ -114,27 +114,24 @@ export default class UIScene extends Phaser.Scene {
     this.island = island;
     island.events.on('hpChanged', this.updateHearts, this);
     island.events.on('inventoryChanged', this.updateHotbar, this);
-    island.events.on('bossSpawned', (boss) => {
-      this.bossBarBg.setVisible(true);
-      this.bossBarTrack.setVisible(true);
-      this.bossBarFill.setVisible(true);
-      this.bossName.setText(boss?.name ?? '').setVisible(true);
-    });
+    island.events.on('bossSpawned', this.showBossBar, this);
     island.events.on('bossHpChanged', this.updateBossBar, this);
-    island.events.on('bossDied', () => {
-      this.bossBarBg.setVisible(false);
-      this.bossBarTrack.setVisible(false);
-      this.bossBarFill.setVisible(false);
-      this.bossName.setVisible(false);
-    });
+    island.events.on('bossDied', this.hideBossBar, this);
     island.events.on('toast', this.showToast, this);
-    island.events.on('hint', (t) => this.hint.setText(t ?? ''));
+    island.events.on('hint', this.updateHint, this);
 
+    // island.events is IslandScene's own emitter, which outlives this UI
+    // scene across restarts - every one of the above must be unhooked by
+    // exact reference here, or re-launching UI (which happens every time
+    // IslandScene re-enters create()) stacks duplicate handlers on it.
     this.events.once('shutdown', () => {
       island.events.off('hpChanged', this.updateHearts, this);
       island.events.off('inventoryChanged', this.updateHotbar, this);
+      island.events.off('bossSpawned', this.showBossBar, this);
       island.events.off('bossHpChanged', this.updateBossBar, this);
+      island.events.off('bossDied', this.hideBossBar, this);
       island.events.off('toast', this.showToast, this);
+      island.events.off('hint', this.updateHint, this);
     });
 
     if (island.player) {
@@ -171,6 +168,24 @@ export default class UIScene extends Phaser.Scene {
   updateBossBar(hp, maxHp) {
     const w = Math.max(0, (hp / maxHp) * 224);
     this.bossBarFill.width = w;
+  }
+
+  showBossBar(boss) {
+    this.bossBarBg.setVisible(true);
+    this.bossBarTrack.setVisible(true);
+    this.bossBarFill.setVisible(true);
+    this.bossName.setText(boss?.name ?? '').setVisible(true);
+  }
+
+  hideBossBar() {
+    this.bossBarBg.setVisible(false);
+    this.bossBarTrack.setVisible(false);
+    this.bossBarFill.setVisible(false);
+    this.bossName.setVisible(false);
+  }
+
+  updateHint(t) {
+    this.hint.setText(t ?? '');
   }
 
   showToast(text) {

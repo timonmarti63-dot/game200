@@ -270,7 +270,27 @@ export default class IslandScene extends Phaser.Scene {
     this.events.emit('hint', cfg.hintText);
     this.time.delayedCall(4500, () => this.events.emit('hint', ''));
 
-    this.events.once('shutdown', () => this.scene.stop('UI'));
+    // Phaser reuses this exact Scene instance every time the island is
+    // (re)entered - on death via scene.restart(), or by sailing back and
+    // landing again. Without explicitly unhooking these on shutdown, every
+    // relisten in the next create() stacks a second (third, fourth, ...)
+    // copy of every handler, so a single sword swing ends up dealing double
+    // damage, loot drops twice, victory/death prompts fire twice, etc.
+    this.events.once('shutdown', () => {
+      this.events.off('playerAttack', this.onPlayerAttack, this);
+      this.events.off('playerParry', this.onPlayerParry, this);
+      this.events.off('playerThrow', this.onPlayerThrow, this);
+      this.events.off('enemyDied', this.onEnemyDied, this);
+      this.events.off('bossThrowVeggie', this.onBossThrowVeggie, this);
+      this.events.off('bossCallGuards', this.onBossCallGuards, this);
+      this.events.off('bossGroundSlam', this.onBossGroundSlam, this);
+      this.events.off('sapperBomb', this.onSapperBomb, this);
+      this.events.off('bossDied', this.onBossDied, this);
+      this.events.off('playerDied', this.onPlayerDied, this);
+      this.events.off('toggleInventory', this.openInventory, this);
+      this.events.off('playerGrapple', this.onPlayerGrapple, this);
+      this.scene.stop('UI');
+    });
   }
 
   openInventory() {

@@ -79,8 +79,16 @@ export default class InventoryScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(11);
 
-    this.input.keyboard.on('keydown-E', () => this.close());
-    this.input.keyboard.on('keydown-ESC', () => this.close());
+    // Bound by reference so shutdown can remove exactly this handler - this
+    // scene instance is reused every time the inventory is (re)opened, and
+    // Phaser never clears `.on()` listeners on its own between launches.
+    this._onCloseKey = () => this.close();
+    this.input.keyboard.on('keydown-E', this._onCloseKey);
+    this.input.keyboard.on('keydown-ESC', this._onCloseKey);
+    this.events.once('shutdown', () => {
+      this.input.keyboard.off('keydown-E', this._onCloseKey);
+      this.input.keyboard.off('keydown-ESC', this._onCloseKey);
+    });
 
     this.render();
   }
